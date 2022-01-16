@@ -27,6 +27,27 @@ begin
 end;
 $$ language 'plpgsql';
 
+/*
+триггер №2
+Команда не может быть отправлена на задание, если она находится на задании или расформирована
+*/
+create or replace function check_go_team_on_mission()
+returns trigger as $$
+begin
+    if (new.status_team = 'busy')
+        then
+        if (old.status_team = 'busy') or (old.status_team = 'disbanded') or (old.status_team = 'no_participant')
+            then return null;
+        end if;
+    return new;    
+    end if;
+end;
+$$ language 'plpgsql';
+
+create trigger go_team_on_mission before update on team
+    for each row execute procedure check_go_team_on_mission();
+
+
 /* тригер №7
 Время начала задания, не может быть
 больше времени эксперимента, входящего в это задание
