@@ -1,6 +1,7 @@
 /*
 тригер №1
 сделка не может быть совершена во время задания одного из ее участников
+использует функцию get_status_team_by_mag_id
 */
 create or replace function check_deal_complete()
 returns trigger as $$
@@ -26,3 +27,17 @@ begin
 end;
 $$ language 'plpgsql';
 
+/* тригер №7
+Время начала задания, не может быть
+больше времени эксперимента, входящего в это задание
+*/
+create or replace function check_start_mission_time()
+returns trigger as $$
+    begin
+        if (new.time_exp <= (select start_time from mission where new.id_mission = id))
+            or (new.time_exp >= (select end_time from mission where new.id_mission = id))
+        then return null;
+        else return new;
+        end if;
+    end;
+$$ language 'plpgsql';
