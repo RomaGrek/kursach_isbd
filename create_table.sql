@@ -49,7 +49,10 @@ create table mission (
     id_area integer references area
                      on delete cascade,
     start_time timestamp not null,
-    end_time timestamp not null
+    end_time timestamp not null,
+    count_exp integer not null
+                     check ((start_time < end_time) and
+                            count_exp>=0)
 );
 
 /* эксперимент OK */
