@@ -652,7 +652,7 @@ $$ language 'plpgsql';
 
 /*generate participant*/
 insert into participant
-select id, get_name(), get_gender(), get_value(16, 70), get_status_part()
+select id, get_name(), get_gender(), get_value(16, 70), 'alive'
 from generate_series(1, 30000) as id;
 
 /*generate area*/
@@ -678,13 +678,18 @@ from generate_series(1, 5000) as id;
 /*generate experiment*/
 insert into experiment
 select i, get_value(1, 4999), get_value(1, 200), get_end_time('1985-11-18')
-from generate_series(1, 4000) as i;
+from generate_series(10001, 14000) as i;
 
 /*generate human*/
-insert into human 
-select human, exp.id, 2
-from  experiment as exp, 
-generate_series(10001, 30000) as human;
+insert into human (id, id_participant)
+select participant.id,participant.id 
+from participant where participant.id>10000;
+
+/*update human*/
+update human 
+set	
+	id_experiment=sub.id
+from (select id from experiment) as sub where human.id=sub.id;
 
 /*generate magican*/
 insert into magician
