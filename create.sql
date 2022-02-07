@@ -1,5 +1,3 @@
-/* создание сущностей для бд */
-
 /* енам уровней OK*/
 create type level as enum ('D', 'C', 'B', 'A', 'S');
 
@@ -18,20 +16,20 @@ create table item (
 create table team (
     id serial primary key,
     team_level level,
-    status_team status_team
+    status_team status_team not null
 );
 
 /* район ОК */
 create table area (
     id serial primary key,
-    level level
+    level level not null
 );
 
 /* инвентарь ОК */
 create table inventory (
     id serial primary key,
-    free_slots integer not null
-                       check (free_slots > 0 and free_slots < 100)
+    busy_slots integer not null
+                       check (busy_slots >= 0 and busy_slots < 100)
 );
 
 /* дверь ОК */
@@ -50,9 +48,8 @@ create table mission (
                      on delete cascade,
     start_time timestamp not null,
     end_time timestamp not null,
-    count_exp integer not null
-                     check ((start_time < end_time) and
-                            count_exp>=0)
+                     check (start_time < end_time),
+    count_exp integer not null default 0
 );
 
 /* эксперимент OK */
@@ -115,6 +112,8 @@ create table exemplar (
     id serial primary key,
     id_item integer references item
                       on delete cascade,
+    id_inventory integer references inventory
+		      on delete cascade,
     status varchar(32) not null
                       check (status = 'good' or status = 'bad')
 );
@@ -140,14 +139,6 @@ create table deal (
     time_deal timestamp not null
 );
 
-/* наличие в инвенатаре предмета ОК */
-create table presence (
-    id_inventory integer references inventory
-                      on delete cascade,
-    id_item integer references item
-                      on delete cascade
-);
-
 create table mission_log (
        id serial primary key,
        id_magician integer references magician
@@ -155,5 +146,3 @@ create table mission_log (
        id_mission integer references mission
                       on delete cascade
 );
-
-
