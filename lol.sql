@@ -628,19 +628,19 @@ from generate_series(1, 3000) as id;
 
 /*generate mission*/
 insert into mission
-select id, get_value(1, 2999), get_value(1, 13), t, get_end_time(t)
-from generate_series(1, 5000) as id, get_time() as t;
+select id, get_value(1, 2999), get_value(1, 13), '1985-11-18', get_end_time('1985-11-18')
+from generate_series(1, 5000) as id;
 
 /*generate experiment*/
 insert into experiment
-select i, id_mis.id, get_value(1, 200), get_end_time(id_mis.start_time)
-from generate_series(1, 7000) as i,
- (select id, start_time from mission where (id=get_value(1, 4999))) as id_mis;
+select i, get_value(1, 4999), get_value(1, 200), get_end_time('1985-11-18')
+from generate_series(1, 4000) as i;
 
 /*generate human*/
-insert into human
-select id, get_value(1, 6999), id
-from generate_series(10001, 30000) as id;
+insert into human 
+select human, exp.id, 2
+from  experiment as exp, 
+generate_series(10001, 30000) as human;
 
 /*generate magican*/
 insert into magician
