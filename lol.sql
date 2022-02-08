@@ -668,16 +668,16 @@ from generate_series(1, 999) as id;
 /*generate team*/
 insert into team
 select id, get_level()::level, get_status_team()::status_team
-from generate_series(1, 3000) as id;
+from generate_series(1, 3500) as id;
 
 /*generate mission*/
 insert into mission
-select id, get_value(1, 2999), get_value(1, 13), '1985-11-18', get_end_time('1985-11-18')
-from generate_series(1, 5000) as id;
+select id, get_value(1, 3499), get_value(1, 13), '1985-11-18', get_end_time('1985-11-18')
+from generate_series(1, 3000) as id;
 
 /*generate experiment*/
 insert into experiment
-select i, get_value(1, 4999), get_value(1, 200), get_end_time('1985-11-18')
+select i, get_value(1, 2999), get_value(1, 200), get_end_time('1985-11-18')
 from generate_series(10001, 14000) as i;
 
 /*generate human*/
@@ -691,10 +691,20 @@ set
 	id_experiment=sub.id
 from (select id from experiment) as sub where human.id=sub.id;
 
-/*generate magican*/
-insert into magician
-select id, get_value(1, 2999), id, get_value(51, 2000)
-from generate_series(1, 10000) as id;
+/*generate magican 1st magian in team*/
+insert into magician 
+select id, id, id, get_value(5000, 5000)
+from generate_series(1, 3000) as id;
+
+/*generate magican 2nd magician in team*/
+insert into magician 
+select id, id - 3000, id, get_value(5000, 5000)
+from generate_series(3001, 6000) as id;
+
+/*generate magican without team*/
+insert into magician (id, id_participant, amount_of_smoke)
+select id, id, get_value(5000, 5000)
+from generate_series(6001, 10000) as id;
 
 /*generate mission_log*/
 insert into mission_log
