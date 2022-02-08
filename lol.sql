@@ -1,6 +1,5 @@
 /*
 Важные детали (они есть)
-
 */
 
 
@@ -17,7 +16,6 @@ truncate table item,
     participant, human, magician,
     incident, exemplar, buyer,
     deal, presence, mission_log;
-
  */
  drop table if exists item,
     team, area, inventory,
@@ -278,23 +276,27 @@ create trigger go_team_on_mission before update on team
 Триггер №3
 В команде не может быть больше 2-ух магов
 очень большой вопрос в is null строчке: скорее всего там not null ПРОВЕРИТЬ НУЖНО!
+(new.id_team <> old.id_team)
 */
 create or replace function check_count_mag_in_team()
 returns trigger as $$
 declare
 count_mag_in_team integer = (select count(*) from magician where id_team = new.id_team);
 begin
-    if (tg_op = 'INSERT') and (new.id_team is null)
+    if (tg_op = 'INSERT') and (new.id_team is not null)
     then
         if (count_mag_in_team > 1)
             then
             return null;
         end if;
-    elseif (new.id_team <> old.id_team)
-    then
-        if (count_mag_in_team > 1)
+    elseif (tg_op = 'UPDATE')
+        then
+        if(new.id_team <> old.id_team)
+            then
+            if (count_mag_in_team > 1)
             then
             return null;
+            end if;
         end if;
     end if;
     return new;
@@ -487,14 +489,11 @@ begin
     end if;
 end;
 $$ language 'plpgsql';
-
 create trigger go_part_id_in_human after insert on human
     for each row execute procedure check_part_id_in_human();
-
  */
 
 /* функция инкремента или декримента для изменения кол-ва занятых слотов
-
  */
 create or replace function inc_dec_busy_slots(id_inventory_fk integer, operation varchar(1))
 returns void as $$
@@ -682,22 +681,22 @@ from generate_series(10001, 14000) as i;
 
 /*generate human*/
 insert into human (id, id_participant)
-select participant.id,participant.id 
+select participant.id,participant.id
 from participant where participant.id>10000;
 
 /*update human*/
-update human 
-set	
+update human
+set
 	id_experiment=sub.id
 from (select id from experiment) as sub where human.id=sub.id;
 
 /*generate magican 1st magian in team*/
-insert into magician 
+insert into magician
 select id, id, id, get_value(5000, 5000)
 from generate_series(1, 3000) as id;
 
 /*generate magican 2nd magician in team*/
-insert into magician 
+insert into magician
 select id, id - 3000, id, get_value(5000, 5000)
 from generate_series(3001, 6000) as id;
 
@@ -740,5 +739,3 @@ from generate_series(1, 5000) as id;
 insert into deal (id, id_buyer, id_exemplar, id_magician, time_deal)
 select id, get_value(3001, 1999), get_value(1, 4999), get_value(1, 9999), get_time()
 from generate_series(1, 4000) as id;
-
-
