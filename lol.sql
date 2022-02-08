@@ -1,3 +1,9 @@
+/*
+Важные детали (они есть)
+
+*/
+
+
 /* скрипт для удаления таблиц */
 
 
@@ -19,7 +25,6 @@ truncate table item,
     participant, human, magician,
     incident, exemplar, buyer,
     deal, presence, mission_log cascade ;
-
 drop function if exists check_deal_complete() cascade;
 
 drop function if exists check_go_team_on_mission() cascade;
@@ -40,7 +45,11 @@ drop function if exists check_status_mag_buyer_for_deal() cascade;
 
 drop function if exists add_count_busy_slots() cascade;
 
+drop function if exists add_count_exp_in_mission() cascade;
+
 drop function if exists inc_dec_busy_slots(integer, varchar) cascade;
+
+drop function if exists inc_count_exp(integer) cascade;
 
 drop function if exists get_status_team_by_mag_id(integer) cascade;
 
@@ -69,6 +78,7 @@ drop function if exists get_name() cascade;
 drop function if exists get_title() cascade;
 
 drop function if exists get_gender() cascade;
+
 
 /* создание сущностей для бд */
 
@@ -122,7 +132,8 @@ create table mission (
                      on delete cascade,
     start_time timestamp not null,
     end_time timestamp not null,
-                     check (start_time < end_time)
+                     check (start_time < end_time),
+    count_exp integer not null default 0
 );
 
 /* эксперимент OK */
@@ -224,6 +235,7 @@ create table mission_log (
 /*
 тригер №1 - вероятность правильности 99%
 сделка не может быть совершена во время задания одного из ее участников
+Как проверять: сделать заведомо неправильный и правильный отдельный insert после того, как все заполниться
 */
 create or replace function check_deal_complete()
 returns trigger as $$
@@ -244,13 +256,14 @@ create trigger deal_mag_mis before insert on deal               -- only insert
 /*
 триггер №2
 Команда не может быть отправлена на задание, если она находится на задании или расформирована
+Сделать проверку новым неравильным и правильным update
 */
 create or replace function check_go_team_on_mission()
 returns trigger as $$
 begin
     if (new.status_team = 'busy')
         then
-        if (old.status_team = 'busy') or (old.status_team = 'disbanded') or (old.status_team = 'no_participant')
+        if (old.status_team <> 'free')
             then return null;
         end if;
     return new;
@@ -264,6 +277,7 @@ create trigger go_team_on_mission before update on team
 /*
 Триггер №3
 В команде не может быть больше 2-ух магов
+очень большой вопрос в is null строчке: скорее всего там not null ПРОВЕРИТЬ НУЖНО!
 */
 create or replace function check_count_mag_in_team()
 returns trigger as $$
@@ -293,6 +307,7 @@ create trigger joining_the_team before insert or update on magician     --- inse
 /*
 триггер №4
 На задания не могут отправляться мертвые маги
+тоже нужна проверка отдельным апдейтом верным и не верным
 */
 create or replace function check_go_mission_die_mag()
 returns trigger as $$
@@ -318,6 +333,7 @@ create trigger go_mag_on_mission before update on team
 /*
  триггер №5 - верно на 99%
  Маг не может быть человеком (ссылаться на одно и то же id)
+ проверить
  */
 create or replace function check_participant_id_for_mag()
 returns trigger as $$
@@ -336,6 +352,7 @@ create trigger mag_participant_id before insert on magician
 /*
  триггер №6 - верно на 99%
  Человек не может быть магом (ссылаться на одно и то же id)
+ тоже проверочка станданртная нужна
  */
 create or replace function check_participant_id_for_human()
 returns trigger as $$
@@ -354,6 +371,7 @@ create trigger human_participant_id before insert on human
 /*
 триггер №7 - верно на 99%
 Мертвые люди не могут участвовать в экспериментах
+проверочка тоже нужна
 */
 create or replace function check_status_human_for_experiment()
 returns trigger as $$
@@ -378,6 +396,7 @@ create trigger go_experiment_human_not_die before update on human
 тригер №8
 Время начала задания, не может быть
 больше времени эксперимента, входящего в это задание
+проверочка тоже нужна
 */
 create or replace function check_start_mission_time()
 returns trigger as $$
@@ -417,6 +436,7 @@ create trigger status_mag_buyer_for_deal before insert on deal
 /*
 Триггер №10
 Каждый раз когда генерим экзмепляр, там генеритьс id_инвентаря. У этого id должно прибавляться поле busy slots.
+еще раз нужно будет проверить
 */
 create or replace function add_count_busy_slots()
 returns trigger as $$
@@ -440,6 +460,21 @@ create trigger auto_add_count_busy_slots after insert or update on exemplar
     for each row execute procedure add_count_busy_slots();
 
 
+/*
+Триггер №11
+Каждый раз когда добавляется id_mission у экмперимента, увеличиваем счетчик на 1
+Вопрос на счет изменения в течении работы программы сущности эксперимент
+*/
+create or replace function add_count_exp_in_mission()
+returns trigger as $$
+begin
+    perform inc_count_exp(new.id_mission);
+    return new;
+end;
+$$ language 'plpgsql';
+
+create trigger auto_add_count_exp_in_mission after insert on experiment
+    for each row execute procedure add_count_exp_in_mission();
 
 /*
 create or replace function check_part_id_in_human()
@@ -474,6 +509,15 @@ begin
 end
 $$ language 'plpgsql';
 
+/*
+функция инкремента количества экспериментов во время миссии
+*/
+create or replace function inc_count_exp(mission_id integer)
+returns void as $$
+begin
+    update mission set count_exp = count_exp + 1 where mission.id = mission_id;
+end;
+$$ language 'plpgsql';
 
 /* функция получения статуса команды по id мага */
 create or replace function get_status_team_by_mag_id(mag_id integer)
@@ -608,7 +652,7 @@ $$ language 'plpgsql';
 
 /*generate participant*/
 insert into participant
-select id, get_name(), get_gender(), get_value(16, 70), get_status_part()
+select id, get_name(), get_gender(), get_value(16, 70), 'alive'
 from generate_series(1, 30000) as id;
 
 /*generate area*/
@@ -624,28 +668,43 @@ from generate_series(1, 999) as id;
 /*generate team*/
 insert into team
 select id, get_level()::level, get_status_team()::status_team
-from generate_series(1, 3000) as id;
+from generate_series(1, 3500) as id;
 
 /*generate mission*/
 insert into mission
-select id, get_value(1, 2999), get_value(1, 13), t, get_end_time(t)
-from generate_series(1, 5000) as id, get_time() as t;
+select id, get_value(1, 3499), get_value(1, 13), '1985-11-18', get_end_time('1985-11-18')
+from generate_series(1, 3000) as id;
 
 /*generate experiment*/
 insert into experiment
-select i, id_mis.id, get_value(1, 200), get_end_time(id_mis.start_time)
-from generate_series(1, 7000) as i,
- (select id, start_time from mission where (id=get_value(1, 4999))) as id_mis;
+select i, get_value(1, 2999), get_value(1, 200), get_end_time('1985-11-18')
+from generate_series(10001, 14000) as i;
 
 /*generate human*/
-insert into human
-select id, get_value(1, 6999), id
-from generate_series(10001, 30000) as id;
+insert into human (id, id_participant)
+select participant.id,participant.id 
+from participant where participant.id>10000;
 
-/*generate magican*/
-insert into magician
-select id, get_value(1, 2999), id, get_value(51, 2000)
-from generate_series(1, 10000) as id;
+/*update human*/
+update human 
+set	
+	id_experiment=sub.id
+from (select id from experiment) as sub where human.id=sub.id;
+
+/*generate magican 1st magian in team*/
+insert into magician 
+select id, id, id, get_value(5000, 5000)
+from generate_series(1, 3000) as id;
+
+/*generate magican 2nd magician in team*/
+insert into magician 
+select id, id - 3000, id, get_value(5000, 5000)
+from generate_series(3001, 6000) as id;
+
+/*generate magican without team*/
+insert into magician (id, id_participant, amount_of_smoke)
+select id, id, get_value(5000, 5000)
+from generate_series(6001, 10000) as id;
 
 /*generate mission_log*/
 insert into mission_log
