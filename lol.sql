@@ -642,6 +642,16 @@ insert into participant
 select id, get_name(), get_gender(), get_value(16, 70), 'alive'
 from generate_series(1, 30000) as id;
 
+/*generate human*/
+insert into human (id, id_participant)
+select participant.id,participant.id
+from participant where participant.id>10000;
+
+/*generate magican*/
+insert into magician (id, id_participant, amount_of_smoke)
+select id, id, get_value(5000, 5000)
+from generate_series(1, 10000) as id;
+
 /*generate area*/
 insert into area
 select id, get_level()::level
@@ -652,25 +662,22 @@ insert into door
 select id, get_value(1, 13)
 from generate_series(1, 999) as id;
 
-/*generate team without 1 member after mission*/
-insert into team
-select id, get_level()::level, 'no_participant'
-from generate_series(1, 500) as id;
-
-/*generate team free*/
-insert into team
-select id, get_level()::level, 'free'
-from generate_series(501, 3000) as id;
-
-/*generate team without 1 member*/
-insert into team
-select id, get_level()::level, 'no_participant'
-from generate_series(3001, 3250) as id;
-
-/*generate team disbanded*/
+/*generate team*/
 insert into team
 select id, get_level()::level, 'disbanded'
-from generate_series(3251, 3500) as id;
+from generate_series(1, 3500) as id;
+
+/*update magician: set 1st member of team*/
+update magician
+set
+	id_team=sub.id
+from (select id from team) as sub where magician.id=sub.id and sub.id<=3000;
+
+/*update magician: set 2nd member of team*/
+update magician
+set
+	id_team=sub.id
+from (select id from team) as sub where magician.id=(sub.id+3000) and sub.id<=3250;
 
 /*generate mission*/
 insert into mission
@@ -680,33 +687,13 @@ from generate_series(1, 3000) as id;
 /*generate experiment*/
 insert into experiment
 select i, get_value(1, 2999), get_value(1, 200), get_end_time('1985-11-18')
-from generate_series(10001, 14000) as i;
-
-/*generate human*/
-insert into human (id, id_participant)
-select participant.id,participant.id
-from participant where participant.id>10000;
+from generate_series(1, 4000) as i;
 
 /*update human*/
 update human
 set
 	id_experiment=sub.id
-from (select id from experiment) as sub where human.id=sub.id;
-
-/*generate magican 1st magian in team*/
-insert into magician
-select id, id, id, get_value(5000, 5000)
-from generate_series(1, 3000) as id;
-
-/*generate magican 2nd magician in team*/
-insert into magician
-select id, id - 3000, id, get_value(5000, 5000)
-from generate_series(3001, 6250) as id;
-
-/*generate magican without team*/
-insert into magician (id, id_participant, amount_of_smoke)
-select id, id, get_value(5000, 5000)
-from generate_series(6251, 10000) as id;
+from (select id from experiment) as sub where human.id=(sub.id+10000);
 
 /*generate incident*/
 insert into incident
