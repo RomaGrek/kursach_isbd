@@ -61,8 +61,6 @@ drop function if exists get_status_part() cascade;
 
 drop function if exists get_status_exm() cascade;
 
-drop function if exists get_status_team() cascade;
-
 drop function if exists get_end_time(timestamp) cascade;
 
 drop function if exists get_time_exp(timestamp) cascade;
@@ -572,16 +570,6 @@ begin
 end;
 $$ language 'plpgsql';
 
-/*generate status_team; нет статуса "busy" чтобы избежать нестыковок по времени*/
-create or replace function get_status_team()
-returns text as $$
-declare
- status_team text array[4] = '{"free","no_participant","disbanded"}';
-begin
-        return status_team[trunc(random()*3)::integer+1];
-end;
-$$ language 'plpgsql';
-
 /*generate end_time*/
 create or replace function get_end_time(start_time timestamp)
 returns timestamp as $$
@@ -664,14 +652,29 @@ insert into door
 select id, get_value(1, 13)
 from generate_series(1, 999) as id;
 
-/*generate team*/
+/*generate team without 1 member after mission*/
 insert into team
-select id, get_level()::level, get_status_team()::status_team
-from generate_series(1, 3500) as id;
+select id, get_level()::level, 'no_participant'
+from generate_series(1, 500) as id;
+
+/*generate team free*/
+insert into team
+select id, get_level()::level, 'free'
+from generate_series(501, 3000) as id;
+
+/*generate team without 1 member*/
+insert into team
+select id, get_level()::level, 'no_participant'
+from generate_series(3001, 3250) as id;
+
+/*generate team disbanded*/
+insert into team
+select id, get_level()::level, 'disbanded'
+from generate_series(3251, 3500) as id;
 
 /*generate mission*/
 insert into mission
-select id, get_value(1, 3499), get_value(1, 13), '1985-11-18', get_end_time('1985-11-18')
+select id, id, get_value(1, 13), '1985-11-18', get_end_time('1985-11-18')
 from generate_series(1, 3000) as id;
 
 /*generate experiment*/
@@ -698,22 +701,27 @@ from generate_series(1, 3000) as id;
 /*generate magican 2nd magician in team*/
 insert into magician
 select id, id - 3000, id, get_value(5000, 5000)
-from generate_series(3001, 6000) as id;
+from generate_series(3001, 6250) as id;
 
 /*generate magican without team*/
 insert into magician (id, id_participant, amount_of_smoke)
 select id, id, get_value(5000, 5000)
-from generate_series(6001, 10000) as id;
-
-/*generate mission_log*/
-insert into mission_log
-select id, get_value(1, 9999), get_value(1, 4999)
-from generate_series(1, 5000) as id;
+from generate_series(6251, 10000) as id;
 
 /*generate incident*/
 insert into incident
-select id, get_value(1, 4999), get_value(1, 9999)
-from generate_series(1, 1000) as id;
+select id, id, id
+from generate_series(1, 500) as id;
+
+/*generate mission_log 1st magician in team*/
+insert into mission_log
+select id, id, id
+from generate_series(1, 3000) as id;
+
+/*generate mission_log 2nd magician in team*/
+insert into mission_log
+select id, id, id-3000
+from generate_series(3001, 6000) as id;
 
 /*generate inventory*/
 insert into inventory
@@ -737,5 +745,5 @@ from generate_series(1, 5000) as id;
 
 /*generate deal*/
 insert into deal (id, id_buyer, id_exemplar, id_magician, time_deal)
-select id, get_value(3001, 1999), get_value(1, 4999), get_value(1, 9999), get_time()
+select id, get_value(3001, 1999), get_value(1, 4999), get_value(1, 9999), get_end_time('1985-11-18')
 from generate_series(1, 4000) as id;
