@@ -95,7 +95,7 @@ create table item (
 /* команда ОК */
 create table team (
     id serial primary key,
-    team_level level,
+    team_level level  default null,
     status_team status_team not null
 );
 
@@ -127,7 +127,7 @@ create table mission (
     id_area integer references area
                      on delete cascade,
     start_time timestamp not null,
-    end_time timestamp not null,
+    end_time timestamp default null,
                      check (start_time < end_time),
     count_exp integer not null default 0
 );
@@ -663,8 +663,8 @@ select id, get_value(1, 13)
 from generate_series(1, 999) as id;
 
 /*generate team*/
-insert into team
-select id, get_level()::level, 'disbanded'
+insert into team (id, status_team)
+select id,  'disbanded'
 from generate_series(1, 3500) as id;
 
 /*update magician: set 1st member of team*/
@@ -680,9 +680,15 @@ set
 from (select id from team) as sub where magician.id=(sub.id+3000) and sub.id<=3250;
 
 /*generate mission*/
-insert into mission
-select id, id, get_value(1, 13), '1985-11-18', get_end_time('1985-11-18')
+insert into mission 
+select id, id, get_value(1, 13), '1985-11-18' 
 from generate_series(1, 3000) as id;
+
+/*update mission: set end time*/
+update mission 
+set
+	end_time=get_end_time('1985-11-18')
+;
 
 /*generate experiment*/
 insert into experiment
