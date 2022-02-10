@@ -21,6 +21,12 @@ truncate table item,
     participant, human, magician,
     incident, exemplar, trader,
     deal, presence, mission_log cascade ;
+drop function if exists get_status_team() cascade;
+
+drop function if exists get_count_mags_in_team(integer) cascade;
+
+drop function if exists update_status_team(text, integer) cascade;
+
 drop function if exists check_deal_complete() cascade;
 
 drop function if exists check_go_team_on_mission() cascade;
@@ -37,7 +43,7 @@ drop function if exists check_status_human_for_experiment() cascade;
 
 drop function if exists check_start_mission_time() cascade;
 
-drop function if exists check_status_mag_trader_for_deal() cascade;
+drop function if exists check_status_mag_buyer_for_deal() cascade;
 
 drop function if exists add_count_busy_slots() cascade;
 
@@ -113,9 +119,9 @@ create table inventory (
 /* задание ОК №5*/
 create table mission (
     id serial primary key,
-    id_team integer references team 
+    id_team integer references team
                      on delete cascade not null,
-    id_area integer references area 
+    id_area integer references area
                      on delete cascade not null,
     start_time timestamp not null,
     end_time timestamp default null,
@@ -126,7 +132,7 @@ create table mission (
 /* эксперимент OK №6*/
 create table experiment (
     id serial primary key,
-    id_mission integer references mission 
+    id_mission integer references mission
                         on delete cascade not null,
     smoke_received integer not null
                         check (smoke_received > 0),
@@ -152,7 +158,7 @@ create table human (
     id_experiment integer references experiment
                    on delete set null
                    default null,
-    id_participant integer references participant 
+    id_participant integer references participant
                    on delete cascade not null
 );
 
@@ -162,7 +168,7 @@ create table magician (
     id_team integer references team
                       on delete set null
                       default null,
-    id_participant integer references participant 
+    id_participant integer references participant
                    on delete cascade not null,
     amount_of_smoke integer not null
                       default 50
@@ -172,18 +178,18 @@ create table magician (
 /* инцидент ОК №10*/
 create table incident (
     id serial primary key,
-    id_mission integer references mission 
+    id_mission integer references mission
                       on delete cascade not null,
-    id_magician integer references magician 
+    id_magician integer references magician
                       on delete cascade not null
 );
 
 /* экземпляр предмета ОК №11*/
 create table exemplar (
     id serial primary key,
-    id_item integer references item 
+    id_item integer references item
                       on delete cascade not null,
-    id_inventory integer references inventory 
+    id_inventory integer references inventory
 		      on delete cascade not null,
     status varchar(32) not null
                       check (status = 'good' or status = 'bad')
@@ -192,20 +198,20 @@ create table exemplar (
 /* покупатель ОК №12*/
 create table trader
 (
-    id_magician  integer primary key references magician 
+    id_magician  integer primary key references magician
         on delete cascade not null,
-    id_inventory integer references inventory 
+    id_inventory integer references inventory
         on delete cascade not null
 );
 
 /* сделка ОК №13*/
 create table deal (
     id serial primary key,
-    id_buyer integer references trader 
+    id_buyer integer references trader
                   on delete cascade not null,
-    id_exemplar integer references exemplar 
+    id_exemplar integer references exemplar
                   on delete cascade not null,
-    id_seller integer references trader 
+    id_seller integer references trader
                   on delete cascade not null,
     time_deal timestamp not null
 );
@@ -213,25 +219,26 @@ create table deal (
 /* история миссий ОК №14*/
 create table mission_log (
        id serial primary key,
-       id_magician integer references magician 
+       id_magician integer references magician
                       on delete cascade not null,
-       id_mission integer references mission 
+       id_mission integer references mission
                       on delete cascade not null
 );
+
 
 
 /*
 тригер №1 - вероятность правильности 99%
 сделка не может быть совершена во время задания одного из ее участников
 Как проверять: сделать заведомо неправильный и правильный отдельный insert после того, как все заполниться
-*/
+
 create or replace function check_deal_complete()
 returns trigger as $$
 declare
     status_team_mag text = (select get_status_team_by_mag_id(new.id_magician));
-    status_team_trader_mag text = (select get_status_team_by_mag_id(new.id_trader));
+    status_team_buyer_mag text = (select get_status_team_by_mag_id(new.id_buyer));
 begin
-    if (status_team_mag = 'busy') or (status_team_trader_mag = 'busy')
+    if (status_team_mag = 'busy') or (status_team_buyer_mag = 'busy')
         then return null;
     end if;
     return new;
@@ -240,6 +247,9 @@ $$ language 'plpgsql';
 
 create trigger deal_mag_mis before insert on deal               -- only insert
     for each row execute procedure check_deal_complete();
+
+ */
+
 
 /*
 триггер №2
@@ -254,8 +264,8 @@ begin
         if (old.status_team <> 'free')
             then return null;
         end if;
-    return new;
     end if;
+    return new;
 end;
 $$ language 'plpgsql';
 
@@ -264,32 +274,75 @@ create trigger go_team_on_mission before update on team
 
 /*
 Триггер №3
-В команде не может быть больше 2-ух магов
-очень большой вопрос в is null строчке: скорее всего там not null ПРОВЕРИТЬ НУЖНО!
-(new.id_team <> old.id_team)
+Также установления статуса
+Проверка на то, что в команде не может быть больше 2-ух магов
+Вот эту штуку лучше лишний раз не трогать, вроде она работает
 */
 create or replace function check_count_mag_in_team()
 returns trigger as $$
-declare
-count_mag_in_team integer = (select count(*) from magician where id_team = new.id_team);
 begin
-    if (tg_op = 'INSERT') and (new.id_team is not null)
-    then
-        if (count_mag_in_team > 1)
-            then
-            return null;
+    if (tg_op = 'INSERT') then
+        if (new.id_team is not null) then
+            if (get_count_mags_in_team(new.id_team) > 1) then
+                return null;
+            else
+                if (get_count_mags_in_team(new.id_team) = 0) then
+                    perform update_status_team('no_participant', new.id_team);
+                else
+                    perform update_status_team('free', new.id_team);
+                end if;
+                return new;
+            end if;
+        else
+            return new;
         end if;
-    elseif (tg_op = 'UPDATE')
-        then
-        if(new.id_team <> old.id_team)
-            then
-            if (count_mag_in_team > 1)
-            then
-            return null;
+    else
+        if (old.id_team is null) then
+            if (new.id_team is not null) then
+                if (get_count_mags_in_team(new.id_team) > 1) then
+                    return null;
+                else
+                    if (get_count_mags_in_team(new.id_team) = 0) then
+                        perform update_status_team('no_participant', new.id_team);
+                    else
+                        perform update_status_team('free', new.id_team);
+                    end if;
+                    return new;
+                end if;
+            else
+                return new;
+            end if;
+        else
+            if (new.id_team is null) then
+                if ((get_count_mags_in_team(old.id_team) - 1) = 1) then
+                    perform update_status_team('no_participant', old.id_team);
+                else
+                    perform update_status_team('disbanded', old.id_team);
+                end if;
+                return new;
+            else
+                if (old.id_team = new.id_team) then
+                    return new;
+                else
+                    if (get_count_mags_in_team(new.id_team) > 1) then
+                        return null;
+                    else
+                        if (get_count_mags_in_team(old.id_team) - 1 = 1) then
+                            perform update_status_team('no_participant', old.id_team);
+                        else
+                            perform update_status_team('disbanded', old.id_team);
+                        end if;
+                        if (get_count_mags_in_team(new.id_team) = 1) then
+                            perform update_status_team('free', new.id_team);
+                        else
+                            perform update_status_team('no_participant', new.id_team);
+                        end if;
+                        return new;
+                    end if;
+                end if;
             end if;
         end if;
     end if;
-    return new;
 end;
 $$ language 'plpgsql';
 
@@ -407,14 +460,14 @@ create trigger time_exp_of_open_close before insert on experiment
 /*
 Триггер №9 - верно на 99%
 сделка не может быть совершена, если один из участников мёртв
-*/
-create or replace function check_status_mag_trader_for_deal()
+
+create or replace function check_status_mag_buyer_for_deal()
 returns trigger as $$
 declare
     status_mag text = get_status_mag(new.id_magician);
-    status_trader text = get_status_mag(new.id_trader);
+    status_buyer text = get_status_mag(new.id_buyer);
 begin
-    if (status_mag = 'die') or (status_trader = 'die')
+    if (status_mag = 'die') or (status_buyer = 'die')
         then
         return null;
     else return new;
@@ -422,8 +475,10 @@ begin
 end;
 $$ language 'plpgsql';
 
-create trigger status_mag_trader_for_deal before insert on deal
-    for each row execute procedure check_status_mag_trader_for_deal();
+create trigger status_mag_buyer_for_deal before insert on deal
+    for each row execute procedure check_status_mag_buyer_for_deal();
+
+ */
 
 /*
 Триггер №10
@@ -469,6 +524,27 @@ create trigger auto_add_count_exp_in_mission after insert on experiment
     for each row execute procedure add_count_exp_in_mission();
 
 /*
+Триггер №12
+Изменение статуса команды при изменении id_team у магов
+
+create or replace function change_status_team()
+returns trigger as $$
+declare
+    count_mag_in_team integer = (select count(*) from magician where id_team = new.id_team);
+begin
+    if (tg_op = 'UPDATE')
+        then
+
+    end if;
+    return new;
+end;
+$$ language 'plpgsql';
+
+create trigger auto_change_status_team before update or insert on magician
+    for each row execute procedure change_status_team();
+*/
+
+/*
 create or replace function check_part_id_in_human()
 returns trigger as $$
 begin
@@ -482,6 +558,27 @@ $$ language 'plpgsql';
 create trigger go_part_id_in_human after insert on human
     for each row execute procedure check_part_id_in_human();
  */
+
+/*
+функция посчета количества магов в команде по id_team
+*/
+
+create or replace function get_count_mags_in_team(id_team_check integer)
+returns integer as $$
+begin
+    return (select count(*) from magician where id_team = id_team_check);
+end;
+$$ language 'plpgsql';
+
+/*
+    функция установки статуса команде по её id
+*/
+create or replace function update_status_team(new_status_team text, id_team integer)
+returns void as $$
+begin
+    update team set status_team = new_status_team::status_team  where team.id = id_team;
+end;
+$$ language 'plpgsql';
 
 /* функция инкремента или декримента для изменения кол-ва занятых слотов
  */
@@ -667,12 +764,12 @@ set
 from (select id from team) as sub where magician.id=(sub.id+3000) and sub.id<=3250;
 
 /*generate mission*/
-insert into mission 
-select id, id, get_value(1, 13), '1985-11-18' 
+insert into mission
+select id, id, get_value(1, 13), '1985-11-18'
 from generate_series(1, 3000) as id;
 
 /*update mission: set end time*/
-update mission 
+update mission
 set
 	end_time=get_end_time('1985-11-18')
 ;
