@@ -14,14 +14,14 @@ truncate table item,
     team, area, inventory,
     door, mission, experiment,
     participant, human, magician,
-    incident, exemplar, buyer,
+    incident, exemplar, trader,
     deal, presence, mission_log;
  */
  drop table if exists item,
     team, area, inventory,
     door, mission, experiment,
     participant, human, magician,
-    incident, exemplar, buyer,
+    incident, exemplar, trader,
     deal, presence, mission_log cascade ;
 drop function if exists check_deal_complete() cascade;
 
@@ -39,7 +39,7 @@ drop function if exists check_status_human_for_experiment() cascade;
 
 drop function if exists check_start_mission_time() cascade;
 
-drop function if exists check_status_mag_buyer_for_deal() cascade;
+drop function if exists check_status_mag_trader_for_deal() cascade;
 
 drop function if exists add_count_busy_slots() cascade;
 
@@ -199,7 +199,7 @@ create table exemplar (
 );
 
 /* покупатель ОК */
-create table buyer
+create table trader
 (
     id_magician  integer primary key references magician
         on delete cascade,
@@ -210,11 +210,11 @@ create table buyer
 /* сделка ОК */
 create table deal (
     id serial primary key,
-    id_buyer integer references buyer
+    id_buyer integer references trader
                   on delete cascade,
     id_exemplar integer references exemplar
                   on delete cascade,
-    id_magician integer references magician
+    id_seller integer references trader 
                   on delete cascade,
     time_deal timestamp not null
 );
@@ -237,9 +237,9 @@ create or replace function check_deal_complete()
 returns trigger as $$
 declare
     status_team_mag text = (select get_status_team_by_mag_id(new.id_magician));
-    status_team_buyer_mag text = (select get_status_team_by_mag_id(new.id_buyer));
+    status_team_trader_mag text = (select get_status_team_by_mag_id(new.id_trader));
 begin
-    if (status_team_mag = 'busy') or (status_team_buyer_mag = 'busy')
+    if (status_team_mag = 'busy') or (status_team_trader_mag = 'busy')
         then return null;
     end if;
     return new;
@@ -416,13 +416,13 @@ create trigger time_exp_of_open_close before insert on experiment
 Триггер №9 - верно на 99%
 сделка не может быть совершена, если один из участников мёртв
 */
-create or replace function check_status_mag_buyer_for_deal()
+create or replace function check_status_mag_trader_for_deal()
 returns trigger as $$
 declare
     status_mag text = get_status_mag(new.id_magician);
-    status_buyer text = get_status_mag(new.id_buyer);
+    status_trader text = get_status_mag(new.id_trader);
 begin
-    if (status_mag = 'die') or (status_buyer = 'die')
+    if (status_mag = 'die') or (status_trader = 'die')
         then
         return null;
     else return new;
@@ -430,8 +430,8 @@ begin
 end;
 $$ language 'plpgsql';
 
-create trigger status_mag_buyer_for_deal before insert on deal
-    for each row execute procedure check_status_mag_buyer_for_deal();
+create trigger status_mag_trader_for_deal before insert on deal
+    for each row execute procedure check_status_mag_trader_for_deal();
 
 /*
 Триггер №10
@@ -721,8 +721,8 @@ insert into inventory
 select id, 0
 from generate_series(3001, 5000) as id;
 
-/*generate buyer*/
-insert into buyer
+/*generate trader*/
+insert into trader
 select id, id
 from generate_series(3001, 5000) as id;
 
@@ -737,6 +737,6 @@ select id, get_value(1, 9999), get_value(3001, 1999), get_status_exm()
 from generate_series(1, 5000) as id;
 
 /*generate deal*/
-insert into deal (id, id_buyer, id_exemplar, id_magician, time_deal)
+insert into deal (id, id_buyer, id_exemplar, id_seller, time_deal)
 select id, get_value(3001, 1999), get_value(1, 4999), get_value(1, 9999), get_end_time('1985-11-18')
 from generate_series(1, 4000) as id;
