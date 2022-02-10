@@ -2,9 +2,7 @@
 Важные детали (они есть)
 */
 
-
 /* скрипт для удаления таблиц */
-
 
 /* удаление енама */
 drop type if exists level, status_team cascade;
@@ -12,14 +10,14 @@ drop type if exists level, status_team cascade;
 /* удаление таблиц
 truncate table item,
     team, area, inventory,
-    door, mission, experiment,
+    mission, experiment,
     participant, human, magician,
     incident, exemplar, trader,
     deal, presence, mission_log;
  */
  drop table if exists item,
     team, area, inventory,
-    door, mission, experiment,
+    mission, experiment,
     participant, human, magician,
     incident, exemplar, trader,
     deal, presence, mission_log cascade ;
@@ -83,7 +81,7 @@ create type level as enum ('D', 'C', 'B', 'A', 'S');
 
 create type status_team as enum ('free', 'busy', 'no_participant', 'disbanded');
 
-/* предмет OK  */
+/* предмет OK  №1*/
 create table item (
     item_code serial primary key,
     title varchar(32) not null,
@@ -92,58 +90,51 @@ create table item (
 );
 
 
-/* команда ОК */
+/* команда ОК №2*/
 create table team (
     id serial primary key,
     team_level level  default null,
     status_team status_team not null
 );
 
-/* район ОК */
+/* район ОК №3*/
 create table area (
     id serial primary key,
     level level not null
 );
 
-/* инвентарь ОК */
+/* инвентарь ОК №4*/
 create table inventory (
     id serial primary key,
     busy_slots integer not null
                        check (busy_slots >= 0 and busy_slots < 100)
 );
 
-/* дверь ОК */
-create table door (
-    id serial primary key,
-    id_area integer references area
-                  on delete cascade
-);
-
-/* задание ОК */
+/* задание ОК №5*/
 create table mission (
     id serial primary key,
-    id_team integer references team
-                     on delete cascade,
-    id_area integer references area
-                     on delete cascade,
+    id_team integer references team 
+                     on delete cascade not null,
+    id_area integer references area 
+                     on delete cascade not null,
     start_time timestamp not null,
     end_time timestamp default null,
                      check (start_time < end_time),
     count_exp integer not null default 0
 );
 
-/* эксперимент OK */
+/* эксперимент OK №6*/
 create table experiment (
     id serial primary key,
-    id_mission integer references mission
-                        on delete cascade,
+    id_mission integer references mission 
+                        on delete cascade not null,
     smoke_received integer not null
                         check (smoke_received > 0),
     time_exp timestamp not null
 );
 
 
-/* Участник OK */
+/* Участник OK №7*/
 create table participant (
     id serial primary key,
     name varchar(32) not null,
@@ -155,76 +146,77 @@ create table participant (
                          check ( status='die' or status = 'alive' )
 );
 
-/* человек OK */
+/* человек OK №8*/
 create table human (
     id serial primary key,
     id_experiment integer references experiment
                    on delete set null
                    default null,
-    id_participant integer references participant
-                   on delete cascade
+    id_participant integer references participant 
+                   on delete cascade not null
 );
 
-/* маг OK */
+/* маг OK №9*/
 create table magician (
     id serial primary key,
     id_team integer references team
                       on delete set null
                       default null,
-    id_participant integer references participant
-                   on delete cascade ,
+    id_participant integer references participant 
+                   on delete cascade not null,
     amount_of_smoke integer not null
                       default 50
                       check (amount_of_smoke > 50)
 );
 
-/* инцидент ОК */
+/* инцидент ОК №10*/
 create table incident (
     id serial primary key,
-    id_mission integer references mission
-                      on delete cascade,
-    id_magician integer references magician
-                      on delete cascade
+    id_mission integer references mission 
+                      on delete cascade not null,
+    id_magician integer references magician 
+                      on delete cascade not null
 );
 
-/* экземпляр предмета ОК */
+/* экземпляр предмета ОК №11*/
 create table exemplar (
     id serial primary key,
-    id_item integer references item
-                      on delete cascade,
-    id_inventory integer references inventory
-		      on delete cascade,
+    id_item integer references item 
+                      on delete cascade not null,
+    id_inventory integer references inventory 
+		      on delete cascade not null,
     status varchar(32) not null
                       check (status = 'good' or status = 'bad')
 );
 
-/* покупатель ОК */
+/* покупатель ОК №12*/
 create table trader
 (
-    id_magician  integer primary key references magician
-        on delete cascade,
-    id_inventory integer references inventory
-        on delete cascade
+    id_magician  integer primary key references magician 
+        on delete cascade not null,
+    id_inventory integer references inventory 
+        on delete cascade not null
 );
 
-/* сделка ОК */
+/* сделка ОК №13*/
 create table deal (
     id serial primary key,
-    id_buyer integer references trader
-                  on delete cascade,
-    id_exemplar integer references exemplar
-                  on delete cascade,
+    id_buyer integer references trader 
+                  on delete cascade not null,
+    id_exemplar integer references exemplar 
+                  on delete cascade not null,
     id_seller integer references trader 
-                  on delete cascade,
+                  on delete cascade not null,
     time_deal timestamp not null
 );
 
+/* история миссий ОК №14*/
 create table mission_log (
        id serial primary key,
-       id_magician integer references magician
-                      on delete cascade,
-       id_mission integer references mission
-                      on delete cascade
+       id_magician integer references magician 
+                      on delete cascade not null,
+       id_mission integer references mission 
+                      on delete cascade not null
 );
 
 
@@ -656,11 +648,6 @@ from generate_series(1, 10000) as id;
 insert into area
 select id, get_level()::level
 from generate_series(1, 13) as id;
-
-/*generate door*/
-insert into door
-select id, get_value(1, 13)
-from generate_series(1, 999) as id;
 
 /*generate team*/
 insert into team (id, status_team)
