@@ -27,8 +27,6 @@ drop function if exists get_count_mags_in_team(integer) cascade;
 
 drop function if exists update_status_team(text, integer) cascade;
 
-drop function if exists check_deal_complete() cascade;
-
 drop function if exists check_go_team_on_mission() cascade;
 
 drop function if exists check_count_mag_in_team() cascade;
@@ -224,31 +222,6 @@ create table mission_log (
        id_mission integer references mission
                       on delete cascade not null
 );
-
-
-
-/*
-тригер №1 - вероятность правильности 99%
-сделка не может быть совершена во время задания одного из ее участников
-Как проверять: сделать заведомо неправильный и правильный отдельный insert после того, как все заполниться
-
-create or replace function check_deal_complete()
-returns trigger as $$
-declare
-    status_team_mag text = (select get_status_team_by_mag_id(new.id_magician));
-    status_team_buyer_mag text = (select get_status_team_by_mag_id(new.id_buyer));
-begin
-    if (status_team_mag = 'busy') or (status_team_buyer_mag = 'busy')
-        then return null;
-    end if;
-    return new;
-end;
-$$ language 'plpgsql';
-
-create trigger deal_mag_mis before insert on deal               -- only insert
-    for each row execute procedure check_deal_complete();
-
- */
 
 
 /*
