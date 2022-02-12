@@ -600,22 +600,6 @@ create trigger auto_add_info_condole_log after update on mission
     for each row execute procedure add_info_condole_log();
 
 /*
-Триггер 15 - можно впихнуть в длинный триггер
-Присваивание команде уровня в зависимости от того, сколько дыма у участников команды
-
-create or replace function update_team_level_after_update_team_id()
-returns trigger as $$
-begin
-
-end;
-$$ language 'plpgsql';
-
-create trigger auto_update_team_level_after_update_team_id after update on magician
-    for each row execute procedure update_team_level_after_update_team_id();
-
- */
-
-/*
 функция подсчёта суммы думы у участников и установления статуса
 */
 create or replace function auto_update_level_team(id_first_mag integer, id_second_mag integer, team_id integer)
