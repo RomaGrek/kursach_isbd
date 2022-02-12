@@ -294,7 +294,7 @@ begin
             end if;
 
             perform update_status_team('free', new.id_team);
-            perform auto_update_level_team(new.id_team);    /* 0p */
+            perform auto_update_level_team(new.id, (select magician.id from magician where magician.id_team = new.id_team), new.id_team);    /* 0p */
             return new;
         end if;
         return new;
@@ -312,7 +312,7 @@ begin
                 end if;
 
                 perform update_status_team('free', new.id_team);
-                perform auto_update_level_team(new.id_team);
+                perform auto_update_level_team(new.id, (select magician.id from magician where magician.id_team = new.id_team), new.id_team);
                 return new;
             end if;
             return new;
@@ -350,7 +350,7 @@ begin
 
                 if (get_count_mags_in_team(new.id_team) = 1) then
                     perform update_status_team('free', new.id_team);
-                    perform auto_update_level_team(new.id_team);
+                    perform auto_update_level_team(new.id, (select magician.id from magician where magician.id_team = new.id_team), new.id_team);
                     return new;
                 end if;
                 /* мб */
@@ -618,34 +618,17 @@ create trigger auto_update_team_level_after_update_team_id after update on magic
 /*
 функция подсчёта суммы думы у участников и установления статуса
 */
-create or replace function auto_update_level_team(team_id integer)
+create or replace function auto_update_level_team(id_first_mag integer, id_second_mag integer, team_id integer)
 returns void as $$
 declare
-    arr_id integer[] = get_id_mags_from_full_team(team_id);
-    id_first_mag integer = arr_id[0];
-    id_second_mag integer = arr_id[1];
     count_smoke_first_mag integer = (select magician.amount_of_smoke from magician where magician.id = id_first_mag);
     count_smoke_second_mag integer = (select magician.amount_of_smoke from magician where magician.id = id_second_mag);
     sum_smoke_in_team integer = count_smoke_first_mag + count_smoke_second_mag;
-    new_level_team varchar(1) ;
+    new_level_team varchar(1);
 begin
-    /*
-    if found then
-        case
-            when (sum_smoke_in_team >= 5000 and sum_smoke_in_team <= 6000) then
-            new_level_team = 'D';
-            when (sum_smoke_in_team >= 6001 and sum_smoke_in_team <= 7500) then
-            new_level_team = 'C';
-            when (sum_smoke_in_team >= 7501 and sum_smoke_in_team <= 8500) then
-            new_level_team = 'B';
-            when (sum_smoke_in_team >= 8501 and sum_smoke_in_team <= 9500) then
-            new_level_team = 'A';
-            else
-            new_level_team = 'S';
-            end case;
-    end if;
 
-     */
+
+
     if (sum_smoke_in_team >= 19001) then
         new_level_team = 'S';
     elsif (sum_smoke_in_team >= 17001) then
@@ -657,20 +640,7 @@ begin
     else
         new_level_team = 'D';
     end if;
-    /*
-    if ((sum_smoke_in_team >= 10000) and (sum_smoke_in_team <= 12000)) then
-        new_level_team = 'D';
-    elsif ((sum_smoke_in_team >= 12001) and (sum_smoke_in_team <= 15000)) then
-        new_level_team = 'C';
-    elsif ((sum_smoke_in_team >= 15001) and (sum_smoke_in_team <= 17000)) then
-        new_level_team = 'B';
-    elsif ((sum_smoke_in_team >= 17001) and (sum_smoke_in_team <= 19000)) then
-        new_level_team = 'A';
-    else
-        new_level_team = 'S';
-    end if;
 
-     */
     update team set team_level = new_level_team::level where id = team_id;
 end;
 $$ language 'plpgsql';
