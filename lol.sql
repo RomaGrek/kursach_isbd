@@ -13,27 +13,24 @@ truncate table item,
     mission, experiment,
     participant, human, magician,
     incident, exemplar, trader,
-    deal, presence, mission_log;
+    deal, mission_log;
  */
  drop table if exists item,
     team, area, inventory,
     mission, experiment,
     participant, human, magician,
     incident, exemplar, trader,
-    deal, presence, mission_log cascade ;
-drop function if exists get_status_team() cascade;
+    deal, mission_log cascade ;
+
+drop function if exists find_inventory_by_exemp(integer) cascade;
 
 drop function if exists get_count_mags_in_team(integer) cascade;
 
+drop function if exists get_status_team(integer) cascade;
+
 drop function if exists update_status_team(text, integer) cascade;
 
-drop function if exists check_deal_complete() cascade;
-
-drop function if exists check_go_team_on_mission() cascade;
-
 drop function if exists check_count_mag_in_team() cascade;
-
-drop function if exists check_go_mission_die_mag() cascade;
 
 drop function if exists check_participant_id_for_mag() cascade;
 
@@ -42,8 +39,6 @@ drop function if exists check_participant_id_for_human() cascade;
 drop function if exists check_status_human_for_experiment() cascade;
 
 drop function if exists check_start_mission_time() cascade;
-
-drop function if exists check_status_mag_buyer_for_deal() cascade;
 
 drop function if exists add_count_busy_slots() cascade;
 
@@ -230,15 +225,16 @@ create table mission_log (
 /*
 тригер №1 - вероятность правильности 99%
 сделка не может быть совершена во время задания одного из ее участников
-Как проверять: сделать заведомо неправильный и правильный отдельный insert после того, как все заполниться
+Как проверять: сделать заведомо неправильный и правильный отдельный insert после того, как все заполниться*/
 
 create or replace function check_deal_complete()
 returns trigger as $$
 declare
-    status_team_mag text = (select get_status_team_by_mag_id(new.id_magician));
+    status_team_mag text = (select get_status_team_by_mag_id(new.id_seller));
     status_team_buyer_mag text = (select get_status_team_by_mag_id(new.id_buyer));
+    check_status_busy bool = (status_team_mag = 'busy') or (status_team_buyer_mag = 'busy'); 
 begin
-    if (status_team_mag = 'busy') or (status_team_buyer_mag = 'busy')
+    if check_status_busy or (get_status_mag(new.id_buyer)='die') or (get_status_mag(new.id_seller)='die')
         then return null;
     end if;
     return new;
@@ -248,29 +244,21 @@ $$ language 'plpgsql';
 create trigger deal_mag_mis before insert on deal               -- only insert
     for each row execute procedure check_deal_complete();
 
- */
-
-
-/*
-триггер №2
-Команда не может быть отправлена на задание, если она находится на задании или расформирована
-Сделать проверку новым неравильным и правильным update
+/*Триггер №2 
+checking the availability of an item in the seller's inventory
 */
-create or replace function check_go_team_on_mission()
+create or replace function check_exemp_in_inventory()
 returns trigger as $$
 begin
-    if (new.status_team = 'busy')
-        then
-        if (old.status_team <> 'free')
-            then return null;
-        end if;
-    end if;
-    return new;
+   if (find_inventory_by_exemp(new.id_exemplar) <> new.id_seller)
+	then return null;
+   end if;
+   return new;
 end;
 $$ language 'plpgsql';
 
-create trigger go_team_on_mission before update on team
-    for each row execute procedure check_go_team_on_mission();
+create trigger check_inventory before insert on deal 
+    for each row execute procedure check_exemp_in_inventory();
 
 /*
 Триггер №3
@@ -367,29 +355,23 @@ create trigger joining_the_team before insert or update on magician     --- inse
 
 /*
 триггер №4
-На задания не могут отправляться мертвые маги
-тоже нужна проверка отдельным апдейтом верным и не верным
+На задания не могут отправляться команды без статуса 'free'
 */
-create or replace function check_go_mission_die_mag()
+create or replace function check_insert_mission()
 returns trigger as $$
 declare
-    mag_id integer;
 begin
-    if (new.status_team = 'busy')
-        then
-        for mag_id in (select magician.id from magician inner join team t on magician.id_team = t.id) loop  -- можно вынести в отдельную функцию
-            if (get_status_mag(mag_id) = 'die')
-                then
-                return null;
-            end if;
-        end loop;
+    if (get_status_team(new.id_team) <> 'free') then
+       return null;
     end if;
+
+    perform update_status_team('busy', new.id_team);
     return new;
 end
 $$ language 'plpgsql';
 
-create trigger go_mag_on_mission before update on team
-    for each row execute procedure check_go_mission_die_mag();
+create trigger go_mag_on_mission before insert on mission 
+    for each row execute procedure check_insert_mission();
 
 /*
  триггер №5 - верно на 99%
@@ -474,29 +456,6 @@ create trigger time_exp_of_open_close before insert on experiment
     for each row execute procedure check_start_mission_time();
 
 /*
-Триггер №9 - верно на 99%
-сделка не может быть совершена, если один из участников мёртв
-
-create or replace function check_status_mag_buyer_for_deal()
-returns trigger as $$
-declare
-    status_mag text = get_status_mag(new.id_magician);
-    status_buyer text = get_status_mag(new.id_buyer);
-begin
-    if (status_mag = 'die') or (status_buyer = 'die')
-        then
-        return null;
-    else return new;
-    end if;
-end;
-$$ language 'plpgsql';
-
-create trigger status_mag_buyer_for_deal before insert on deal
-    for each row execute procedure check_status_mag_buyer_for_deal();
-
- */
-
-/*
 Триггер №10
 Каждый раз когда генерим экзмепляр, там генеритьс id_инвентаря. У этого id должно прибавляться поле busy slots.
 еще раз нужно будет проверить
@@ -517,8 +476,6 @@ begin
 
 end;
 $$ language 'plpgsql';
-
-
 create trigger auto_add_count_busy_slots after insert or update on exemplar
     for each row execute procedure add_count_busy_slots();
 
@@ -526,7 +483,6 @@ create trigger auto_add_count_busy_slots after insert or update on exemplar
 /*
 Триггер №11
 Каждый раз когда добавляется id_mission у экмперимента, увеличиваем счетчик на 1
-Вопрос на счет изменения в течении работы программы сущности эксперимент
 */
 create or replace function add_count_exp_in_mission()
 returns trigger as $$
@@ -579,7 +535,6 @@ create trigger auto_update_status_mag_after_incident after insert on incident
 /*
 Триггер 14
 если делается update end timme, то в лог записывается инфа
-+ походу надо изменять статус команды на свободна, если никто из магов не мертв
 */
 create or replace function add_info_condole_log()
 returns trigger as $$
@@ -591,6 +546,10 @@ begin
     if (new.end_time is not null and old.end_time is null) then
         perform insert_log(new.id, mag_id_first);
         perform insert_log(new.id, mag_id_second);
+    end if;
+ 
+    if (get_status_mag(mag_id_first) <> 'die' and get_status_mag(mag_id_second) <> 'die') then
+        perform update_status_team('free', new.id_team);
     end if;
     return new;
 end;
@@ -611,8 +570,6 @@ declare
     new_level_team varchar(1);
 begin
 
-
-
     if (sum_smoke_in_team >= 19001) then
         new_level_team = 'S';
     elsif (sum_smoke_in_team >= 17001) then
@@ -626,6 +583,16 @@ begin
     end if;
 
     update team set team_level = new_level_team::level where id = team_id;
+end;
+$$ language 'plpgsql';
+
+/*
+function for find id_inventory by exemplar
+*/
+create or replace function find_inventory_by_exemp(id_exemplar integer)
+returns integer as $$
+begin
+   return (select id_inventory from exemplar where exemplar.id=id_exemplar); 
 end;
 $$ language 'plpgsql';
 
@@ -702,6 +669,16 @@ create or replace function get_count_mags_in_team(id_team_check integer)
 returns integer as $$
 begin
     return (select count(*) from magician where id_team = id_team_check);
+end;
+$$ language 'plpgsql';
+
+/*
+  get status team  
+*/
+create or replace function get_status_team(id_team integer)
+returns text as $$
+begin
+    return (select status_team from team where team.id = id_team);
 end;
 $$ language 'plpgsql';
 
@@ -925,25 +902,16 @@ insert into incident
 select id, id, id
 from generate_series(1, 500) as id;
 
-/*generate mission_log 1st magician in team
-insert into mission_log
-select id, id, id
-from generate_series(1, 3000) as id;
-
-/*generate mission_log 2nd magician in team*/
-insert into mission_log
-select id, id, id-3000
-from generate_series(3001, 6000) as id; */
 
 /*generate inventory*/
 insert into inventory
 select id, 0
-from generate_series(3001, 5000) as id;
+from generate_series(1, 2000) as id;
 
 /*generate trader*/
 insert into trader
 select id, id
-from generate_series(3001, 5000) as id;
+from generate_series(1, 2000) as id;
 
 /*generate item*/
 insert into item
@@ -952,10 +920,10 @@ from generate_series(1, 10000) as id;
 
 /*generate exemplar*/
 insert into exemplar
-select id, get_value(1, 9999), get_value(3001, 1999), get_status_exm()
+select id, get_value(1, 9999), get_value(1, 1999), get_status_exm()
 from generate_series(1, 5000) as id;
 
 /*generate deal*/
 insert into deal (id, id_buyer, id_exemplar, id_seller, time_deal)
-select id, get_value(3001, 1999), get_value(1, 4999), get_value(1, 9999), get_end_time('1985-11-18')
+select id, get_value(1, 1999), get_value(1, 2999), get_value(1,1999), get_end_time('1985-11-18')
 from generate_series(1, 4000) as id;
