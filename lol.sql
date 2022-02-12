@@ -276,7 +276,7 @@ create trigger go_team_on_mission before update on team
 Триггер №3
 Также установления статуса
 Проверка на то, что в команде не может быть больше 2-ух магов
-Вот эту штуку лучше лишний раз не трогать, вроде она работает
++ подсчёт дыма в команде (через доп функцию)
 */
 create or replace function check_count_mag_in_team()
 returns trigger as $$
@@ -294,6 +294,7 @@ begin
             end if;
 
             perform update_status_team('free', new.id_team);
+            perform auto_update_level_team(new.id_team);    /* 0p */
             return new;
         end if;
         return new;
@@ -311,6 +312,7 @@ begin
                 end if;
 
                 perform update_status_team('free', new.id_team);
+                perform auto_update_level_team(new.id_team);
                 return new;
             end if;
             return new;
@@ -319,10 +321,14 @@ begin
             if (new.id_team is null) then
                 if ((get_count_mags_in_team(old.id_team) - 1) = 1) then
                     perform update_status_team('no_participant', old.id_team);
+                    /* уровень апдейтим в null */
+                    perform go_level_team_null(old.id_team);
                     return new;
                 end if;
 
+                /* уровень апдейтим в null */
                 perform update_status_team('disbanded', old.id_team);
+                perform go_level_team_null(old.id_team);
                 return new;
             else
                 if (old.id_team = new.id_team) then
@@ -339,11 +345,15 @@ begin
                		  perform update_status_team('disbanded', old.id_team);
                 end if;
 
+                /* уровень апдейтим в null у старой команды */
+                perform go_level_team_null(old.id_team);
+
                 if (get_count_mags_in_team(new.id_team) = 1) then
                     perform update_status_team('free', new.id_team);
+                    perform auto_update_level_team(new.id_team);
                     return new;
                 end if;
-
+                /* мб */
                 perform update_status_team('no_participant', new.id_team);
                 return new;
             end if;
@@ -588,6 +598,92 @@ $$ language 'plpgsql';
 
 create trigger auto_add_info_condole_log after update on mission
     for each row execute procedure add_info_condole_log();
+
+/*
+Триггер 15 - можно впихнуть в длинный триггер
+Присваивание команде уровня в зависимости от того, сколько дыма у участников команды
+
+create or replace function update_team_level_after_update_team_id()
+returns trigger as $$
+begin
+
+end;
+$$ language 'plpgsql';
+
+create trigger auto_update_team_level_after_update_team_id after update on magician
+    for each row execute procedure update_team_level_after_update_team_id();
+
+ */
+
+/*
+функция подсчёта суммы думы у участников и установления статуса
+*/
+create or replace function auto_update_level_team(team_id integer)
+returns void as $$
+declare
+    arr_id integer[] = get_id_mags_from_full_team(team_id);
+    id_first_mag integer = arr_id[0];
+    id_second_mag integer = arr_id[1];
+    count_smoke_first_mag integer = (select magician.amount_of_smoke from magician where magician.id = id_first_mag);
+    count_smoke_second_mag integer = (select magician.amount_of_smoke from magician where magician.id = id_second_mag);
+    sum_smoke_in_team integer = count_smoke_first_mag + count_smoke_second_mag;
+    new_level_team varchar(1) ;
+begin
+    /*
+    if found then
+        case
+            when (sum_smoke_in_team >= 5000 and sum_smoke_in_team <= 6000) then
+            new_level_team = 'D';
+            when (sum_smoke_in_team >= 6001 and sum_smoke_in_team <= 7500) then
+            new_level_team = 'C';
+            when (sum_smoke_in_team >= 7501 and sum_smoke_in_team <= 8500) then
+            new_level_team = 'B';
+            when (sum_smoke_in_team >= 8501 and sum_smoke_in_team <= 9500) then
+            new_level_team = 'A';
+            else
+            new_level_team = 'S';
+            end case;
+    end if;
+
+     */
+    if (sum_smoke_in_team >= 19001) then
+        new_level_team = 'S';
+    elsif (sum_smoke_in_team >= 17001) then
+        new_level_team = 'A';
+    elsif (sum_smoke_in_team >= 15001) then
+        new_level_team = 'B';
+    elsif (sum_smoke_in_team >= 12001) then
+        new_level_team = 'C';
+    elseif(sum_smoke_in_team >= 10000) then
+        new_level_team = 'D';
+    end if;
+    /*
+    if ((sum_smoke_in_team >= 10000) and (sum_smoke_in_team <= 12000)) then
+        new_level_team = 'D';
+    elsif ((sum_smoke_in_team >= 12001) and (sum_smoke_in_team <= 15000)) then
+        new_level_team = 'C';
+    elsif ((sum_smoke_in_team >= 15001) and (sum_smoke_in_team <= 17000)) then
+        new_level_team = 'B';
+    elsif ((sum_smoke_in_team >= 17001) and (sum_smoke_in_team <= 19000)) then
+        new_level_team = 'A';
+    else
+        new_level_team = 'S';
+    end if;
+
+     */
+    update team set team_level = new_level_team::level where id = team_id;
+end;
+$$ language 'plpgsql';
+
+/*
+функция апргейда в налл уровня команды
+*/
+create or replace function go_level_team_null(team_id integer)
+returns void as $$
+begin
+    update team set team_level = null where team.id = team_id;
+end;
+$$ language 'plpgsql';
 
 /*
 функция получения id магов в команде (полной)
