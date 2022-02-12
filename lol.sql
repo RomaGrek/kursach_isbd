@@ -27,6 +27,8 @@ drop function if exists get_count_mags_in_team(integer) cascade;
 
 drop function if exists update_status_team(text, integer) cascade;
 
+drop function if exists check_deal_complete() cascade;
+
 drop function if exists check_go_team_on_mission() cascade;
 
 drop function if exists check_count_mag_in_team() cascade;
@@ -224,6 +226,31 @@ create table mission_log (
 );
 
 
+
+/*
+тригер №1 - вероятность правильности 99%
+сделка не может быть совершена во время задания одного из ее участников
+Как проверять: сделать заведомо неправильный и правильный отдельный insert после того, как все заполниться
+
+create or replace function check_deal_complete()
+returns trigger as $$
+declare
+    status_team_mag text = (select get_status_team_by_mag_id(new.id_magician));
+    status_team_buyer_mag text = (select get_status_team_by_mag_id(new.id_buyer));
+begin
+    if (status_team_mag = 'busy') or (status_team_buyer_mag = 'busy')
+        then return null;
+    end if;
+    return new;
+end;
+$$ language 'plpgsql';
+
+create trigger deal_mag_mis before insert on deal               -- only insert
+    for each row execute procedure check_deal_complete();
+
+ */
+
+
 /*
 триггер №2
 Команда не может быть отправлена на задание, если она находится на задании или расформирована
@@ -254,65 +281,71 @@ create trigger go_team_on_mission before update on team
 create or replace function check_count_mag_in_team()
 returns trigger as $$
 begin
+/*insert with the id_team field set. Handling 3 standard situations: 0, 1 or 2 participants in a team.*/
     if (tg_op = 'INSERT') then
         if (new.id_team is not null) then
             if (get_count_mags_in_team(new.id_team) > 1) then
                 return null;
-            else
-                if (get_count_mags_in_team(new.id_team) = 0) then
-                    perform update_status_team('no_participant', new.id_team);
-                else
-                    perform update_status_team('free', new.id_team);
-                end if;
+            end if;
+
+            if (get_count_mags_in_team(new.id_team) = 0) then
+                perform update_status_team('no_participant', new.id_team);
                 return new;
             end if;
-        else
+
+            perform update_status_team('free', new.id_team);
             return new;
         end if;
+        return new;
     else
+/*update. Handling cases when old.id_team is null or not. In each case can be 3 standard situations(see over)*/
         if (old.id_team is null) then
             if (new.id_team is not null) then
                 if (get_count_mags_in_team(new.id_team) > 1) then
                     return null;
-                else
-                    if (get_count_mags_in_team(new.id_team) = 0) then
-                        perform update_status_team('no_participant', new.id_team);
-                    else
-                        perform update_status_team('free', new.id_team);
-                    end if;
+                end if;
+
+                if (get_count_mags_in_team(new.id_team) = 0) then
+                    perform update_status_team('no_participant', new.id_team);
                     return new;
                 end if;
-            else
+
+                perform update_status_team('free', new.id_team);
                 return new;
             end if;
+            return new;
         else
+/*Handling cases when magician die or not*/
             if (new.id_team is null) then
                 if ((get_count_mags_in_team(old.id_team) - 1) = 1) then
                     perform update_status_team('no_participant', old.id_team);
-                else
-                    perform update_status_team('disbanded', old.id_team);
+                    return new;
                 end if;
+
+                perform update_status_team('disbanded', old.id_team);
                 return new;
             else
                 if (old.id_team = new.id_team) then
                     return new;
-                else
-                    if (get_count_mags_in_team(new.id_team) > 1) then
-                        return null;
-                    else
-                        if (get_count_mags_in_team(old.id_team) - 1 = 1) then
-                            perform update_status_team('no_participant', old.id_team);
-                        else
-                            perform update_status_team('disbanded', old.id_team);
-                        end if;
-                        if (get_count_mags_in_team(new.id_team) = 1) then
-                            perform update_status_team('free', new.id_team);
-                        else
-                            perform update_status_team('no_participant', new.id_team);
-                        end if;
-                        return new;
-                    end if;
                 end if;
+
+                if (get_count_mags_in_team(new.id_team) > 1) then
+                    return null;
+                end if;
+
+                if (get_count_mags_in_team(old.id_team) - 1 = 1) then
+                    perform update_status_team('no_participant', old.id_team);
+                else
+               		  perform update_status_team('disbanded', old.id_team);
+                end if;
+
+                if (get_count_mags_in_team(new.id_team) = 1) then
+                    perform update_status_team('free', new.id_team);
+                    return new;
+                end if;
+
+                perform update_status_team('no_participant', new.id_team);
+                return new;
             end if;
         end if;
     end if;
@@ -496,41 +529,120 @@ $$ language 'plpgsql';
 create trigger auto_add_count_exp_in_mission after insert on experiment
     for each row execute procedure add_count_exp_in_mission();
 
+
 /*
-Триггер №12
-Изменение статуса команды при изменении id_team у магов
-
-create or replace function change_status_team()
+Триггер 12
+Если делаем update id_experient у Human, то его статус меняется на мёртв
+*/
+create or replace function check_die_human_on_experiment()
 returns trigger as $$
-declare
-    count_mag_in_team integer = (select count(*) from magician where id_team = new.id_team);
 begin
-    if (tg_op = 'UPDATE')
-        then
-
+    if ((old.id_experiment is null) and (new.id_experiment is not null)) then
+        perform update_status_participant(new.id_participant, 'die');
     end if;
     return new;
 end;
 $$ language 'plpgsql';
 
-create trigger auto_change_status_team before update or insert on magician
-    for each row execute procedure change_status_team();
-*/
+create trigger auto_check_die_human_on_experiment after update on human
+    for each row execute procedure check_die_human_on_experiment();
 
 /*
-create or replace function check_part_id_in_human()
+Триггер 13
+Если появляется ициндент, то статус мага изменяется на die
+Также маг удаляется из команды и у команды меняется статус
+*/
+create or replace function update_status_mag_after_incident()
 returns trigger as $$
+declare
+    id_participant_mag integer = (select id_participant from magician where magician.id = new.id_magician);
 begin
-    if ((select count(*) from experiment where experiment.id = new.id_experiment) = 0)
-        then
-        return null;
-    else return new;
-    end if;
+    perform update_status_participant(id_participant_mag, 'die');
+    perform update_id_team_on_mag(new.id_magician);
+    return new;
 end;
 $$ language 'plpgsql';
-create trigger go_part_id_in_human after insert on human
-    for each row execute procedure check_part_id_in_human();
- */
+
+create trigger auto_update_status_mag_after_incident after insert on incident
+    for each row execute procedure update_status_mag_after_incident();
+
+/*
+Триггер 14
+если делается update end timme, то в лог записывается инфа
++ походу надо изменять статус команды на свободна, если никто из магов не мертв
+*/
+create or replace function add_info_condole_log()
+returns trigger as $$
+declare
+    arr_id integer[] = get_id_mags_from_full_team(new.id_team);
+    mag_id_first integer = arr_id[0];
+    mag_id_second integer = arr_id[1];
+begin
+    if (new.end_time is not null and old.end_time is null) then
+        perform insert_log(new.id, mag_id_first);
+        perform insert_log(new.id, mag_id_second);
+    end if;
+    return new;
+end;
+$$ language 'plpgsql';
+
+create trigger auto_add_info_condole_log after update on mission
+    for each row execute procedure add_info_condole_log();
+
+/*
+функция получения id магов в команде (полной)
+*/
+create or replace function get_id_mags_from_full_team(team_id integer)
+returns integer[] as $$
+declare
+    arr_mags_id integer[];
+begin
+    arr_mags_id[0] = (select magician.id from magician where magician.id_team = team_id limit 1);
+    arr_mags_id[1] = (select magician.id from magician where magician.id_team = team_id and magician.id <> arr_mags_id[0]);
+    return arr_mags_id;
+end;
+$$ language 'plpgsql';
+
+/*
+функция для логирования
+пока что под вопросом как работает PK
+*/
+create or replace function insert_log(mission_id_log integer, magician_id_log integer)
+returns void as $$
+declare
+    new_id_mission_log integer;
+begin
+    if ((select count(*) from mission_log) > 0) then
+        new_id_mission_log = (select max(id) from mission_log) + 1;
+    else
+        new_id_mission_log = 1;
+    end if;
+
+    insert into mission_log values (new_id_mission_log, magician_id_log, mission_id_log);
+end;
+$$ language 'plpgsql';
+
+
+
+/*
+функция изменения id команды у мага в null
+*/
+create or replace function update_id_team_on_mag(id_mag integer)
+returns void as $$
+begin
+    update magician set id_team = null where magician.id = id_mag;
+end;
+$$ language 'plpgsql';
+
+/*
+функция изменения статуса participant по его id
+*/
+create or replace function update_status_participant(id_participant integer, new_status varchar(32))
+returns void as $$
+begin
+    update participant set status = new_status where participant.id = id_participant;
+end;
+$$ language 'plpgsql';
 
 /*
 функция посчета количества магов в команде по id_team
@@ -763,7 +875,7 @@ insert into incident
 select id, id, id
 from generate_series(1, 500) as id;
 
-/*generate mission_log 1st magician in team*/
+/*generate mission_log 1st magician in team
 insert into mission_log
 select id, id, id
 from generate_series(1, 3000) as id;
@@ -771,7 +883,7 @@ from generate_series(1, 3000) as id;
 /*generate mission_log 2nd magician in team*/
 insert into mission_log
 select id, id, id-3000
-from generate_series(3001, 6000) as id;
+from generate_series(3001, 6000) as id; */
 
 /*generate inventory*/
 insert into inventory
