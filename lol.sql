@@ -654,7 +654,7 @@ begin
         new_level_team = 'B';
     elsif (sum_smoke_in_team >= 12001) then
         new_level_team = 'C';
-    elseif(sum_smoke_in_team >= 10000) then
+    else
         new_level_team = 'D';
     end if;
     /*
