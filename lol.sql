@@ -297,7 +297,6 @@ create trigger swap_exemplar after insert on deal
 /*
 Триггер №5
 Каждый раз когда генерим экзмепляр, там генеритьс id_инвентаря. У этого id должно прибавляться поле busy slots.
-еще раз нужно будет проверить
 */
 create or replace function add_count_busy_slots()
 returns trigger as $$
@@ -518,14 +517,13 @@ returns trigger as $$
         if (new.time_exp <= (select start_time from mission where new.id_mission = id))
             or (new.time_exp >= (select end_time from mission where new.id_mission = id))
         then return null;
-        else return new;
-        end if;
+	end if;
+        return new;
     end;
 $$ language 'plpgsql';
 
 create trigger time_exp_of_open_close before insert on experiment
     for each row execute procedure check_start_mission_time();
-
 
 
 /*
@@ -536,12 +534,16 @@ create trigger time_exp_of_open_close before insert on experiment
 create or replace function add_count_exp_in_mission()
 returns trigger as $$
 begin
+    if ((select id from mission where id=new.id_mission) is null) then
+	return null;
+    end if;
+
     perform inc_count_exp(new.id_mission);
     return new;
 end;
 $$ language 'plpgsql';
 
-create trigger auto_add_count_exp_in_mission after insert on experiment
+create trigger auto_add_count_exp_in_mission before insert on experiment
     for each row execute procedure add_count_exp_in_mission();
 
 
@@ -575,13 +577,17 @@ returns trigger as $$
 declare
     id_participant_mag integer = (select id_participant from magician where magician.id = new.id_magician);
 begin
+    if ((select id from mission where id=new.id_mission) is null) then
+	return null;
+    end if;
+
     perform update_status_participant(id_participant_mag, 'die');
     perform update_id_team_on_mag(new.id_magician);
     return new;
 end;
 $$ language 'plpgsql';
 
-create trigger auto_update_status_mag_after_incident after insert on incident
+create trigger auto_update_status_mag_after_incident before insert on incident
     for each row execute procedure update_status_mag_after_incident();
 
 
@@ -945,7 +951,6 @@ from generate_series(1, 13) as id;
 
 /*generate team*/
 insert into team (id, status_team)
-select id,  'disbanded'
 from generate_series(1, 3500) as id;
 
 /*update magician: set 1st member of team*/
@@ -984,7 +989,7 @@ from (select id from experiment) as sub where human.id=(sub.id+10000);
 
 /*generate incident*/
 insert into incident
-select id, id, id
+select id, get_value(1, 2999), get_value(1, 5999)
 from generate_series(1, 500) as id;
 
 /*generate inventory*/
