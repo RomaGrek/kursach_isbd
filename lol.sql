@@ -220,12 +220,12 @@ create table mission_log (
                       on delete cascade not null
 );
 
-
+/*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=TRIGGERS-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
 /*
-тригер №1 - вероятность правильности 99%
+тригер №1 
 сделка не может быть совершена во время задания одного из ее участников
-Как проверять: сделать заведомо неправильный и правильный отдельный insert после того, как все заполниться*/
+*/
 
 create or replace function check_deal_complete()
 returns trigger as $$
@@ -244,6 +244,7 @@ $$ language 'plpgsql';
 create trigger deal_mag_mis before insert on deal               -- only insert
     for each row execute procedure check_deal_complete();
 
+
 /*Триггер №2 
 checking the availability of an item in the seller's inventory
 */
@@ -260,12 +261,72 @@ $$ language 'plpgsql';
 create trigger check_inventory before insert on deal 
     for each row execute procedure check_exemp_in_inventory();
 
+
+/*Триггер №3 
+checking that buyer <> seller 
+*/
+create or replace function check_same_id_bs()
+returns trigger as $$
+begin
+   if (new.id_buyer = new.id_seller)
+	then return null;
+   end if;
+   return new;
+end;
+$$ language 'plpgsql';
+
+create trigger check_copy_id before insert on deal 
+    for each row execute procedure check_same_id_bs();
+
+
+/*Триггер №4 
+swap exemplar between inventory
+*/
+create or replace function change_inventory()
+returns trigger as $$
+begin
+   update exemplar set id_inventory=new.id_buyer where id_inventory=new.id_seller;
+   return new;
+end;
+$$ language 'plpgsql';
+
+create trigger swap_exemplar after insert on deal 
+    for each row execute procedure change_inventory();
+
+
 /*
-Триггер №3
+Триггер №5
+Каждый раз когда генерим экзмепляр, там генеритьс id_инвентаря. У этого id должно прибавляться поле busy slots.
+еще раз нужно будет проверить
+*/
+create or replace function add_count_busy_slots()
+returns trigger as $$
+begin
+
+    if (tg_op = 'INSERT')
+        then
+        perform inc_dec_busy_slots(new.id_inventory, '+');
+    elseif (tg_op = 'UPDATE')
+        then
+        perform inc_dec_busy_slots(old.id_inventory, '-');
+        perform inc_dec_busy_slots(new.id_inventory, '+');
+    end if;
+    return new;
+
+end;
+$$ language 'plpgsql';
+
+create trigger auto_add_count_busy_slots after insert or update on exemplar
+    for each row execute procedure add_count_busy_slots();
+
+
+/*
+Триггер №6
 Также установления статуса
 Проверка на то, что в команде не может быть больше 2-ух магов
 + подсчёт дыма в команде (через доп функцию)
 */
+
 create or replace function check_count_mag_in_team()
 returns trigger as $$
 begin
@@ -353,10 +414,12 @@ $$ language 'plpgsql';
 create trigger joining_the_team before insert or update on magician     --- insert and update
     for each row execute procedure check_count_mag_in_team();
 
+
 /*
-триггер №4
+триггер №7
 На задания не могут отправляться команды без статуса 'free'
 */
+
 create or replace function check_insert_mission()
 returns trigger as $$
 declare
@@ -373,11 +436,13 @@ $$ language 'plpgsql';
 create trigger go_mag_on_mission before insert on mission 
     for each row execute procedure check_insert_mission();
 
+
 /*
- триггер №5 - верно на 99%
+ триггер №8 
  Маг не может быть человеком (ссылаться на одно и то же id)
  проверить
  */
+
 create or replace function check_participant_id_for_mag()
 returns trigger as $$
 begin
@@ -392,11 +457,13 @@ $$ language 'plpgsql';
 create trigger mag_participant_id before insert on magician
     for each row execute procedure check_participant_id_for_mag();
 
+
 /*
- триггер №6 - верно на 99%
+ триггер №9 
  Человек не может быть магом (ссылаться на одно и то же id)
  тоже проверочка станданртная нужна
  */
+
 create or replace function check_participant_id_for_human()
 returns trigger as $$
 begin
@@ -411,11 +478,13 @@ $$ language 'plpgsql';
 create trigger human_participant_id before insert on human
     for each row execute procedure check_participant_id_for_human();
 
+
 /*
-триггер №7 - верно на 99%
+триггер №10 
 Мертвые люди не могут участвовать в экспериментах
 проверочка тоже нужна
 */
+
 create or replace function check_status_human_for_experiment()
 returns trigger as $$
 declare
@@ -435,12 +504,14 @@ $$ language 'plpgsql';
 create trigger go_experiment_human_not_die before update on human
     for each row execute procedure check_status_human_for_experiment();
 
+
 /*
-тригер №8
+тригер №11
 Время начала задания, не может быть
 больше времени эксперимента, входящего в это задание
 проверочка тоже нужна
 */
+
 create or replace function check_start_mission_time()
 returns trigger as $$
     begin
@@ -455,35 +526,13 @@ $$ language 'plpgsql';
 create trigger time_exp_of_open_close before insert on experiment
     for each row execute procedure check_start_mission_time();
 
-/*
-Триггер №10
-Каждый раз когда генерим экзмепляр, там генеритьс id_инвентаря. У этого id должно прибавляться поле busy slots.
-еще раз нужно будет проверить
-*/
-create or replace function add_count_busy_slots()
-returns trigger as $$
-begin
-
-    if (tg_op = 'INSERT')
-        then
-        perform inc_dec_busy_slots(new.id_inventory, '+');
-    elseif (tg_op = 'UPDATE')
-        then
-        perform inc_dec_busy_slots(old.id_inventory, '-');
-        perform inc_dec_busy_slots(new.id_inventory, '+');
-    end if;
-    return new;
-
-end;
-$$ language 'plpgsql';
-create trigger auto_add_count_busy_slots after insert or update on exemplar
-    for each row execute procedure add_count_busy_slots();
 
 
 /*
-Триггер №11
+Триггер №12
 Каждый раз когда добавляется id_mission у экмперимента, увеличиваем счетчик на 1
 */
+
 create or replace function add_count_exp_in_mission()
 returns trigger as $$
 begin
@@ -497,9 +546,10 @@ create trigger auto_add_count_exp_in_mission after insert on experiment
 
 
 /*
-Триггер 12
+Триггер №13
 Если делаем update id_experient у Human, то его статус меняется на мёртв
 */
+
 create or replace function check_die_human_on_experiment()
 returns trigger as $$
 begin
@@ -513,11 +563,13 @@ $$ language 'plpgsql';
 create trigger auto_check_die_human_on_experiment after update on human
     for each row execute procedure check_die_human_on_experiment();
 
+
 /*
-Триггер 13
+Триггер №14
 Если появляется ициндент, то статус мага изменяется на die
 Также маг удаляется из команды и у команды меняется статус
 */
+
 create or replace function update_status_mag_after_incident()
 returns trigger as $$
 declare
@@ -532,10 +584,12 @@ $$ language 'plpgsql';
 create trigger auto_update_status_mag_after_incident after insert on incident
     for each row execute procedure update_status_mag_after_incident();
 
+
 /*
-Триггер 14
-если делается update end timme, то в лог записывается инфа
+Триггер №15
+если делается update end time, то в лог записывается инфа и статус тимы менянется на 'free'
 */
+
 create or replace function add_info_condole_log()
 returns trigger as $$
 declare
@@ -557,6 +611,9 @@ $$ language 'plpgsql';
 
 create trigger auto_add_info_condole_log after update on mission
     for each row execute procedure add_info_condole_log();
+
+
+/*=-=-=-=-=-=-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=FUNCTION-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
 /*
 функция подсчёта суммы думы у участников и установления статуса
@@ -730,7 +787,7 @@ create or replace function get_status_mag(mag_id integer)
 returns text as $$
 begin
     return (select status from participant where id = (select id_participant from magician where magician.id = mag_id));
-end
+end;
 $$ language 'plpgsql';
 
 /* Функция получения статуса (жив/мёртв) человека по его id */
@@ -738,7 +795,7 @@ create or replace function get_status_human(human_id integer)
 returns text as $$
 begin
     return (select status from participant where participant.id = (select id_participant from human where human.id = human_id));
-end
+end;
 $$ language 'plpgsql';
 
 /*generate level*/
@@ -836,7 +893,7 @@ end;
 $$ language 'plpgsql';
 
 
-/*=-=-=-=--=-=-=-SHORT FUNCTION(id)=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/*=-=-=-=-=-=-=-=--=-=-=-=-=-=-==-=-=--=-=-=-GENERATE DATA=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
 /*generate participant*/
 insert into participant
@@ -877,7 +934,7 @@ from (select id from team) as sub where magician.id=(sub.id+3000) and sub.id<=32
 
 /*generate mission*/
 insert into mission
-select id, id, get_value(1, 13), '1985-11-18'
+select id, get_value(1, 3499), get_value(1, 13), '1985-11-18'
 from generate_series(1, 3000) as id;
 
 /*update mission: set end time*/
@@ -888,7 +945,7 @@ set
 
 /*generate experiment*/
 insert into experiment
-select i, get_value(1, 2999), get_value(1, 200), get_end_time('1985-11-18')
+select i, get_value(1, 3499), get_value(1, 200), get_end_time('1985-11-18')
 from generate_series(1, 4000) as i;
 
 /*update human*/
@@ -901,7 +958,6 @@ from (select id from experiment) as sub where human.id=(sub.id+10000);
 insert into incident
 select id, id, id
 from generate_series(1, 500) as id;
-
 
 /*generate inventory*/
 insert into inventory
@@ -920,10 +976,10 @@ from generate_series(1, 10000) as id;
 
 /*generate exemplar*/
 insert into exemplar
-select id, get_value(1, 9999), get_value(1, 1999), get_status_exm()
-from generate_series(1, 5000) as id;
+select id, get_value(1, 9999), id, get_status_exm()
+from generate_series(1, 2000) as id;
 
 /*generate deal*/
 insert into deal (id, id_buyer, id_exemplar, id_seller, time_deal)
-select id, get_value(1, 1999), get_value(1, 2999), get_value(1,1999), get_end_time('1985-11-18')
-from generate_series(1, 4000) as id;
+select id, id+1000, id , id, get_end_time('1986-11-18')
+from generate_series(1, 1000) as id;
