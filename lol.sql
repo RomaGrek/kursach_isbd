@@ -223,7 +223,7 @@ create table mission_log (
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=TRIGGERS-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
 /*
-тригер №1 
+тригер №1
 сделка не может быть совершена во время задания одного из ее участников
 */
 
@@ -232,7 +232,7 @@ returns trigger as $$
 declare
     status_team_mag text = (select get_status_team_by_mag_id(new.id_seller));
     status_team_buyer_mag text = (select get_status_team_by_mag_id(new.id_buyer));
-    check_status_busy bool = (status_team_mag = 'busy') or (status_team_buyer_mag = 'busy'); 
+    check_status_busy bool = (status_team_mag = 'busy') or (status_team_buyer_mag = 'busy');
 begin
     if check_status_busy or (get_status_mag(new.id_buyer)='die') or (get_status_mag(new.id_seller)='die')
         then return null;
@@ -245,7 +245,7 @@ create trigger deal_mag_mis before insert on deal               -- only insert
     for each row execute procedure check_deal_complete();
 
 
-/*Триггер №2 
+/*Триггер №2
 checking the availability of an item in the seller's inventory
 */
 create or replace function check_exemp_in_inventory()
@@ -258,12 +258,12 @@ begin
 end;
 $$ language 'plpgsql';
 
-create trigger check_inventory before insert on deal 
+create trigger check_inventory before insert on deal
     for each row execute procedure check_exemp_in_inventory();
 
 
-/*Триггер №3 
-checking that buyer <> seller 
+/*Триггер №3
+checking that buyer <> seller
 */
 create or replace function check_same_id_bs()
 returns trigger as $$
@@ -275,11 +275,11 @@ begin
 end;
 $$ language 'plpgsql';
 
-create trigger check_copy_id before insert on deal 
+create trigger check_copy_id before insert on deal
     for each row execute procedure check_same_id_bs();
 
 
-/*Триггер №4 
+/*Триггер №4
 swap exemplar between inventory
 */
 create or replace function change_inventory()
@@ -290,7 +290,7 @@ begin
 end;
 $$ language 'plpgsql';
 
-create trigger swap_exemplar after insert on deal 
+create trigger swap_exemplar after insert on deal
     for each row execute procedure change_inventory();
 
 
@@ -433,12 +433,12 @@ begin
 end
 $$ language 'plpgsql';
 
-create trigger go_mag_on_mission before insert on mission 
+create trigger go_mag_on_mission before insert on mission
     for each row execute procedure check_insert_mission();
 
 
 /*
- триггер №8 
+ триггер №8
  Маг не может быть человеком (ссылаться на одно и то же id)
  проверить
  */
@@ -459,7 +459,7 @@ create trigger mag_participant_id before insert on magician
 
 
 /*
- триггер №9 
+ триггер №9
  Человек не может быть магом (ссылаться на одно и то же id)
  тоже проверочка станданртная нужна
  */
@@ -480,7 +480,7 @@ create trigger human_participant_id before insert on human
 
 
 /*
-триггер №10 
+триггер №10
 Мертвые люди не могут участвовать в экспериментах
 проверочка тоже нужна
 */
@@ -601,7 +601,7 @@ begin
         perform insert_log(new.id, mag_id_first);
         perform insert_log(new.id, mag_id_second);
     end if;
- 
+
     if (get_status_mag(mag_id_first) <> 'die' and get_status_mag(mag_id_second) <> 'die') then
         perform update_status_team('free', new.id_team);
     end if;
@@ -611,6 +611,35 @@ $$ language 'plpgsql';
 
 create trigger auto_add_info_condole_log after update on mission
     for each row execute procedure add_info_condole_log();
+
+
+/*
+Триггер 16
+Проверка уровня доступа команды магов к району при отправке на задание
+*/
+create or replace function check_level_team_area()
+returns trigger as $$
+declare
+    level_area varchar(1) = (select area.level from area where area.id = new.id_area)::varchar(1);
+    level_team varchar(1) = (select team.team_level from team where team.id = new.id_team)::varchar(1);
+begin
+    if (level_team = 'D' and level_area = 'D') then
+        return new;
+    elsif (level_team = 'C' and (level_area = 'D' or level_area = 'C')) then
+        return new;
+    elsif (level_team = 'B' and level_area <> 'S' and level_area <> 'A') then
+        return new;
+    elsif (level_team = 'A' and level_area <> 'S') then
+        return new;
+    elsif (level_team = 'S') then
+        return new;
+    end if;
+    return null;
+end;
+$$ language 'plpgsql';
+
+create trigger auto_check_level_team_area before insert on mission
+    for each row execute procedure check_level_team_area();
 
 
 /*=-=-=-=-=-=-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=FUNCTION-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -649,7 +678,7 @@ function for find id_inventory by exemplar
 create or replace function find_inventory_by_exemp(id_exemplar integer)
 returns integer as $$
 begin
-   return (select id_inventory from exemplar where exemplar.id=id_exemplar); 
+   return (select id_inventory from exemplar where exemplar.id=id_exemplar);
 end;
 $$ language 'plpgsql';
 
@@ -730,7 +759,7 @@ end;
 $$ language 'plpgsql';
 
 /*
-  get status team  
+  get status team
 */
 create or replace function get_status_team(id_team integer)
 returns text as $$
