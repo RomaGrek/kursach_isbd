@@ -970,8 +970,9 @@ $$ language 'plpgsql';
 
 
 create or replace function add_mission(id_team integer, id_area integer)
+returns void as $$
 declare 
-	curr_timestamp timestemp = (select localtimestamp);
+	curr_timestamp timestamp = (select localtimestamp);
 begin 
 	insert into mission values (id_team, id_area, curr_timestamp);
 end;
@@ -979,6 +980,7 @@ $$ language 'plpgsql';
 
 
 create or replace function set_end_time(id_team integer)
+returns void as $$
 declare
 	curr_timestamp timestamp =(select localtimestamp);
 begin
@@ -988,6 +990,7 @@ $$ language 'plpgsql';
 
 
 create or replace function add_incident(id_mag integer, team integer)
+returns void as $$
 begin
 	insert into incident values (team, id_mag);
 end;
