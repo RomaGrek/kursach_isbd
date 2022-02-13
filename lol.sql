@@ -611,6 +611,34 @@ $$ language 'plpgsql';
 
 create trigger auto_add_info_condole_log after update on mission
     for each row execute procedure add_info_condole_log();
+    
+/*
+Триггер 16
+Проверка уровня доступа команды магов к району при отправке на задание
+*/
+create or replace function check_level_team_area()
+returns trigger as $$
+declare
+    level_area varchar(1) = (select area.level from area where area.id = new.id_area)::varchar(1);
+    level_team varchar(1) = (select team.team_level from team where team.id = new.id_team)::varchar(1);
+begin
+    if (level_team = 'D' and level_area = 'D') then
+        return new;
+    elsif (level_team = 'C' and (level_area = 'D' or level_area = 'C')) then
+        return new;
+    elsif (level_team = 'B' and level_area <> 'S' and level_area <> 'A') then
+        return new;
+    elsif (level_team = 'A' and level_area <> 'S') then
+        return new;
+    elsif (level_team = 'S') then
+        return new;
+    end if;
+    return null;
+end;
+$$ language 'plpgsql';
+
+create trigger auto_check_level_team_area before insert on mission
+    for each row execute procedure check_level_team_area();   
 
 
 /*=-=-=-=-=-=-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=FUNCTION-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
