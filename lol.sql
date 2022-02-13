@@ -646,6 +646,23 @@ $$ language 'plpgsql';
 create trigger auto_check_level_team_area before insert on mission
     for each row execute procedure check_level_team_area();   
 
+/*
+Триггер 17
+check participation mag in mission for incident
+*/
+create or replace function check_part_mission()
+returns trigger as $$
+begin
+    if((select id from mission_log where id_mission=new.id_mission and
+		id_magician=new.id_magician) is null) then
+	return null;
+    end if;
+    return new;
+end;
+$$ language 'plpgsql';
+
+create trigger auto_check_incident before insert on incident
+    for each row execute procedure check_part_mission();
 
 /*=-=-=-=-=-=-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=FUNCTION-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
@@ -926,6 +943,55 @@ begin
 end;
 $$ language 'plpgsql';
 
+/*=-=-=-=-=-=-=-=--=-=-=-=-=-=-==-=-=--=-=-=-BUSINESS FUNTION-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+
+create or replace function show_all_magician()
+returns void as $$
+begin
+	select mag.id, mag.id_team ,part.status from magician mag left join participant part on mag.id=part.id;
+end;
+$$ language 'plpgsql';
+
+
+create or replace function show_all_team()
+returns void as $$
+begin
+	select * from team;
+end;
+$$ language 'plpgsql';
+
+
+create or replace function add_participant_team(id_magician integer, team integer)
+returns void as $$
+begin
+	update magician set id_team=team where magician.id=id_magician;
+end;
+$$ language 'plpgsql';
+
+
+create or replace function add_mission(id_team integer, id_area integer)
+declare 
+	curr_timestamp timestemp = (select localtimestamp);
+begin 
+	insert into mission values (id_team, id_area, curr_timestamp);
+end;
+$$ language 'plpgsql';
+
+
+create or replace function set_end_time(id_team integer)
+declare
+	curr_timestamp timestamp =(select localtimestamp);
+begin
+	update mission set end_time=curr_timestamp where mission.id=id_team;
+end;
+$$ language 'plpgsql';
+
+
+create or replace function add_incident(id_mag integer, team integer)
+begin
+	insert into incident values (team, id_mag);
+end;
+$$ language 'plpgsql';
 
 /*=-=-=-=-=-=-=-=--=-=-=-=-=-=-==-=-=--=-=-=-GENERATE DATA=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
@@ -990,7 +1056,7 @@ from (select id from experiment) as sub where human.id=(sub.id+10000);
 
 /*generate incident*/
 insert into incident
-select id, get_value(1, 2999), get_value(1, 5999)
+select id, id, id
 from generate_series(1, 500) as id;
 
 /*generate inventory*/
