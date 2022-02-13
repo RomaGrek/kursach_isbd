@@ -934,7 +934,7 @@ from (select id from team) as sub where magician.id=(sub.id+3000) and sub.id<=32
 
 /*generate mission*/
 insert into mission
-select id, get_value(1, 3499), get_value(1, 13), '1985-11-18'
+select id, id, get_value(1, 13), '1985-11-18'
 from generate_series(1, 3000) as id;
 
 /*update mission: set end time*/
@@ -945,7 +945,7 @@ set
 
 /*generate experiment*/
 insert into experiment
-select i, get_value(1, 3499), get_value(1, 200), get_end_time('1985-11-18')
+select i, get_value(1, 2999), get_value(1, 200), get_end_time('1985-11-18')
 from generate_series(1, 4000) as i;
 
 /*update human*/
