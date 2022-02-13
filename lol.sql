@@ -951,6 +951,7 @@ from generate_series(1, 13) as id;
 
 /*generate team*/
 insert into team (id, status_team)
+select id, 'disbanded'
 from generate_series(1, 3500) as id;
 
 /*update magician: set 1st member of team*/
