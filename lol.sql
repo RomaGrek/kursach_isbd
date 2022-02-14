@@ -664,7 +664,104 @@ $$ language 'plpgsql';
 create trigger auto_check_incident before insert on incident
     for each row execute procedure check_part_mission();
 
+/*
+Триггер 18
+Добавление кол-ва дыма магам
+*/
+create or replace function add_smoke_after_experiment()
+returns trigger as $$
+declare
+    team_id integer = (select mission.id_team from mission where mission.id = new.id_mission);
+    arr_mags integer = get_id_mags_from_full_team(team_id);
+    id_mag_first integer = arr_mags[0];
+    id_mag_second integer = arr_mags[1];
+begin
+    perform add_smoke_after_exp_func(new.smoke_received, id_mag_first, id_mag_second);
+end;
+$$ language 'plpgsql';
+
+create trigger auto_add_smoke_after_experiment after insert on experiment
+    for each row execute procedure add_smoke_after_experiment();
+
 /*=-=-=-=-=-=-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=FUNCTION-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+
+/*
+функция добавления дыма магам после эксперимента
+*/
+create or replace function add_smoke_after_exp_func(count_smoke integer, mag_first_id integer, mag_second_id integer)
+returns void as $$
+begin
+    update magician set amount_of_smoke = amount_of_smoke + count_smoke where magician.id = mag_first_id;
+    update magician set amount_of_smoke = amount_of_smoke + count_smoke where magician.id = mag_second_id;
+end;
+$$ language 'plpgsql';
+/*
+функция трейдера
+заключение сделки
+*/
+create or replace function do_deal(id_deal integer, exemplar_id integer, buyer_id integer, seller_id integer)
+returns void as $$
+begin
+    insert into deal values (id_deal, exemplar_id, buyer_id, seller_id, (select now())::timestamp);
+end;
+$$ language 'plpgsql';
+
+/*
+функция трейдера
+Получение его инвентаря по его id
+*/
+create or replace function get_inventory_by_id(trader_magician_id integer)
+returns void as $$
+begin
+     select * from exemplar where exemplar.id_inventory = (select * from trader where trader.id_magician = trader_magician_id);
+end;
+$$ language 'plpgsql';
+
+
+/*
+функцияя команды
+внесение информации об участии человека в экмперименте
+*/
+create or replace function doing_hunan_in_experiment(experiment_id integer, human_id integer)
+returns void as $$
+begin
+    update human set id_experiment = experiment_id where human.id = human_id;
+end;
+$$ language 'plpgsql';
+
+/*
+функция команды
+внесение инфомации о экмперименте
+*/
+create or replace function do_experiment(experiment_id integer, mission_id integer, smoke_received_get integer)
+returns void as $$
+begin
+    insert into experiment values (experiment_id, mission_id, smoke_received_get, (select now())::timestamp);
+end;
+$$ language 'plpgsql';
+
+/*
+функция команды
+получения доступных зон
+*/
+create or replace function get_access_area(team_level_n level)
+returns void as $$
+declare
+    t_level varchar(1) = team_level_n::varchar(1);
+begin
+    if (t_level = 'D') then
+        select * from area where level::varchar(1) = 'D';
+    elsif (t_level = 'C') then
+        select * from area where level::varchar(1) in ('D', 'C');
+    elsif (t_level = 'B') then
+        select * from area where level::varchar(1) in ('D', 'C', 'B');
+    elsif (t_level = 'A') then
+        select * from area where level::varchar(1) in ('A', 'B', 'C', 'D');
+    else
+        select * from area;
+    end if;
+end;
+$$ language 'plpgsql';
 
 /*
 функция подсчёта суммы думы у участников и установления статуса
