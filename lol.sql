@@ -962,6 +962,7 @@ $$ language 'plpgsql';
 
 create or replace function add_team(team integer)
 returns void as $$
+begin
 	insert into team (id) values (team);
 end;
 $$ language 'plpgsql';
