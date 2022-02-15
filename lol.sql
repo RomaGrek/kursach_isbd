@@ -22,13 +22,65 @@ truncate table item,
     incident, exemplar, trader,
     deal, mission_log cascade ;
 
-drop function if exists find_inventory_by_exemp(integer) cascade;
+drop function if exists check_deal_complete() cascade;
 
-drop function if exists get_count_mags_in_team(integer) cascade;
+drop function if exists check_exemp_in_inventory() cascade;
 
-drop function if exists get_status_team(integer) cascade;
+drop function if exists check_same_id_bs() cascade;
 
-drop function if exists update_status_team(text, integer) cascade;
+drop function if exists change_inventory() cascade;
+
+drop function if exists check_insert_mission() cascade;
+
+drop function if exists check_die_human_on_experiment() cascade;
+
+drop function if exists update_status_mag_after_incident() cascade;
+
+drop function if exists add_info_condole_log() cascade;
+
+drop function if exists check_level_team_area() cascade;
+
+drop function if exists check_part_mission() cascade;
+
+drop function if exists add_smoke_after_experiment() cascade;
+
+drop function if exists update_level_team_after_exp(integer, varchar) cascade;
+
+drop function if exists add_smoke_after_exp_func(integer, integer, integer) cascade;
+
+drop function if exists do_deal(integer, integer, integer, integer) cascade;
+
+drop function if exists doing_hunan_in_experiment(integer, integer) cascade;
+
+drop function if exists do_experiment(integer, integer, integer) cascade;
+
+drop function if exists auto_update_level_team(integer, integer, integer) cascade;
+
+drop function if exists go_level_team_null(integer) cascade;
+
+drop function if exists get_id_mags_from_full_team(integer) cascade;
+
+drop function if exists insert_log(integer, integer) cascade;
+
+drop function if exists update_id_team_on_mag(integer) cascade;
+
+drop function if exists update_status_participant(integer, varchar) cascade;
+
+drop function if exists show_all_magician() cascade;
+
+drop function if exists show_all_team() cascade;
+
+drop function if exists add_team(integer) cascade;
+
+drop function if exists add_participant_team(integer, integer) cascade;
+
+drop function if exists add_mission(integer, integer, integer) cascade;
+
+drop function if exists set_end_time(integer) cascade;
+
+drop function if exists add_incident(integer, integer, integer) cascade;
+
+drop function if exists add_count_busy_slots() cascade;
 
 drop function if exists check_count_mag_in_team() cascade;
 
@@ -40,9 +92,15 @@ drop function if exists check_status_human_for_experiment() cascade;
 
 drop function if exists check_start_mission_time() cascade;
 
-drop function if exists add_count_busy_slots() cascade;
-
 drop function if exists add_count_exp_in_mission() cascade;
+
+drop function if exists find_inventory_by_exemp(integer) cascade;
+
+drop function if exists get_count_mags_in_team(integer) cascade;
+
+drop function if exists get_status_team(integer) cascade;
+
+drop function if exists update_status_team(text, integer) cascade;
 
 drop function if exists inc_dec_busy_slots(integer, varchar) cascade;
 
@@ -73,6 +131,10 @@ drop function if exists get_name() cascade;
 drop function if exists get_title() cascade;
 
 drop function if exists get_gender() cascade;
+
+drop function if exists get_inventory_by_id(integer) cascade;
+
+drop function if exists get_access_area(integer) cascade;
 
 
 /* создание сущностей для бд */
@@ -223,7 +285,7 @@ create table mission_log (
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=TRIGGERS-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
 /*
-тригер №1 
+тригер №1
 сделка не может быть совершена во время задания одного из ее участников
 */
 
@@ -232,7 +294,7 @@ returns trigger as $$
 declare
     status_team_mag text = (select get_status_team_by_mag_id(new.id_seller));
     status_team_buyer_mag text = (select get_status_team_by_mag_id(new.id_buyer));
-    check_status_busy bool = (status_team_mag = 'busy') or (status_team_buyer_mag = 'busy'); 
+    check_status_busy bool = (status_team_mag = 'busy') or (status_team_buyer_mag = 'busy');
 begin
     if check_status_busy or (get_status_mag(new.id_buyer)='die') or (get_status_mag(new.id_seller)='die')
         then return null;
@@ -245,7 +307,7 @@ create trigger deal_mag_mis before insert on deal               -- only insert
     for each row execute procedure check_deal_complete();
 
 
-/*Триггер №2 
+/*Триггер №2
 checking the availability of an item in the seller's inventory
 */
 create or replace function check_exemp_in_inventory()
@@ -258,12 +320,12 @@ begin
 end;
 $$ language 'plpgsql';
 
-create trigger check_inventory before insert on deal 
+create trigger check_inventory before insert on deal
     for each row execute procedure check_exemp_in_inventory();
 
 
-/*Триггер №3 
-checking that buyer <> seller 
+/*Триггер №3
+checking that buyer <> seller
 */
 create or replace function check_same_id_bs()
 returns trigger as $$
@@ -275,11 +337,11 @@ begin
 end;
 $$ language 'plpgsql';
 
-create trigger check_copy_id before insert on deal 
+create trigger check_copy_id before insert on deal
     for each row execute procedure check_same_id_bs();
 
 
-/*Триггер №4 
+/*Триггер №4
 swap exemplar between inventory
 */
 create or replace function change_inventory()
@@ -290,7 +352,7 @@ begin
 end;
 $$ language 'plpgsql';
 
-create trigger swap_exemplar after insert on deal 
+create trigger swap_exemplar after insert on deal
     for each row execute procedure change_inventory();
 
 
@@ -432,12 +494,12 @@ begin
 end
 $$ language 'plpgsql';
 
-create trigger go_mag_on_mission before insert on mission 
+create trigger go_mag_on_mission before insert on mission
     for each row execute procedure check_insert_mission();
 
 
 /*
- триггер №8 
+ триггер №8
  Маг не может быть человеком (ссылаться на одно и то же id)
  проверить
  */
@@ -458,7 +520,7 @@ create trigger mag_participant_id before insert on magician
 
 
 /*
- триггер №9 
+ триггер №9
  Человек не может быть магом (ссылаться на одно и то же id)
  тоже проверочка станданртная нужна
  */
@@ -479,7 +541,7 @@ create trigger human_participant_id before insert on human
 
 
 /*
-триггер №10 
+триггер №10
 Мертвые люди не могут участвовать в экспериментах
 проверочка тоже нужна
 */
@@ -607,7 +669,7 @@ begin
         perform insert_log(new.id, mag_id_first);
         perform insert_log(new.id, mag_id_second);
     end if;
- 
+
     if (get_status_mag(mag_id_first) <> 'die' and get_status_mag(mag_id_second) <> 'die') then
         perform update_status_team('free', new.id_team);
     end if;
@@ -617,7 +679,7 @@ $$ language 'plpgsql';
 
 create trigger auto_add_info_condole_log after update on mission
     for each row execute procedure add_info_condole_log();
-    
+
 /*
 Триггер 16
 Проверка уровня доступа команды магов к району при отправке на задание
@@ -644,7 +706,7 @@ end;
 $$ language 'plpgsql';
 
 create trigger auto_check_level_team_area before insert on mission
-    for each row execute procedure check_level_team_area();   
+    for each row execute procedure check_level_team_area();
 
 /*
 Триггер 17
@@ -671,19 +733,45 @@ create trigger auto_check_incident before insert on incident
 create or replace function add_smoke_after_experiment()
 returns trigger as $$
 declare
-    team_id integer = (select mission.id_team from mission where mission.id = new.id_mission);
-    arr_mags integer = get_id_mags_from_full_team(team_id);
-    id_mag_first integer = arr_mags[0];
-    id_mag_second integer = arr_mags[1];
+    id_mag_first integer = (select magician.id from magician where magician.id_team = (select mission.id_team from mission where mission.id = new.id_mission) limit 1);
+    id_mag_second integer = (select magician.id from magician where (magician.id_team = (select mission.id_team from mission where mission.id = new.id_mission)) and magician.id <> id_mag_first);
+    old_sum_smoke integer = (select magician.amount_of_smoke from magician where magician.id = id_mag_first) + (select magician.amount_of_smoke from magician where magician.id = id_mag_second);
+    new_level_team varchar(1);
+    team_id_op integer = (select mission.id from mission where mission.id = new.id_mission);
 begin
     perform add_smoke_after_exp_func(new.smoke_received, id_mag_first, id_mag_second);
+    /* проверка на то, что не изменился ли уровень команды */
+    if ((old_sum_smoke + new.smoke_received + new.smoke_received) >= 19001) then
+        new_level_team = 'S';
+    elsif ((old_sum_smoke + new.smoke_received + new.smoke_received) >= 17001) then
+        new_level_team = 'A';
+    elsif ((old_sum_smoke + new.smoke_received + new.smoke_received) >= 15001) then
+        new_level_team = 'B';
+    elsif ((old_sum_smoke + new.smoke_received + new.smoke_received) >= 12001) then
+        new_level_team = 'C';
+    else
+        new_level_team = 'D';
+    end if;
+    perform update_level_team_after_exp(team_id_op, new_level_team);
+    return new;
 end;
 $$ language 'plpgsql';
 
 create trigger auto_add_smoke_after_experiment after insert on experiment
     for each row execute procedure add_smoke_after_experiment();
 
+
 /*=-=-=-=-=-=-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=FUNCTION-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/*
+ функция изменения статуса команды
+ */
+create or replace function update_level_team_after_exp(team_id_n integer, level_char varchar(1))
+returns void as $$
+begin
+    update team set team_level = level_char::level where team.id = team_id_n;
+end;
+$$ language 'plpgsql';
+
 
 /*
 функция добавления дыма магам после эксперимента
@@ -693,73 +781,6 @@ returns void as $$
 begin
     update magician set amount_of_smoke = amount_of_smoke + count_smoke where magician.id = mag_first_id;
     update magician set amount_of_smoke = amount_of_smoke + count_smoke where magician.id = mag_second_id;
-end;
-$$ language 'plpgsql';
-/*
-функция трейдера
-заключение сделки
-*/
-create or replace function do_deal(id_deal integer, exemplar_id integer, buyer_id integer, seller_id integer)
-returns void as $$
-begin
-    insert into deal values (id_deal, exemplar_id, buyer_id, seller_id, (select now())::timestamp);
-end;
-$$ language 'plpgsql';
-
-/*
-функция трейдера
-Получение его инвентаря по его id
-*/
-create or replace function get_inventory_by_id(trader_magician_id integer)
-returns void as $$
-begin
-     select * from exemplar where exemplar.id_inventory = (select * from trader where trader.id_magician = trader_magician_id);
-end;
-$$ language 'plpgsql';
-
-
-/*
-функцияя команды
-внесение информации об участии человека в экмперименте
-*/
-create or replace function doing_hunan_in_experiment(experiment_id integer, human_id integer)
-returns void as $$
-begin
-    update human set id_experiment = experiment_id where human.id = human_id;
-end;
-$$ language 'plpgsql';
-
-/*
-функция команды
-внесение инфомации о экмперименте
-*/
-create or replace function do_experiment(experiment_id integer, mission_id integer, smoke_received_get integer)
-returns void as $$
-begin
-    insert into experiment values (experiment_id, mission_id, smoke_received_get, (select now())::timestamp);
-end;
-$$ language 'plpgsql';
-
-/*
-функция команды
-получения доступных зон
-*/
-create or replace function get_access_area(team_level_n level)
-returns void as $$
-declare
-    t_level varchar(1) = team_level_n::varchar(1);
-begin
-    if (t_level = 'D') then
-        select * from area where level::varchar(1) = 'D';
-    elsif (t_level = 'C') then
-        select * from area where level::varchar(1) in ('D', 'C');
-    elsif (t_level = 'B') then
-        select * from area where level::varchar(1) in ('D', 'C', 'B');
-    elsif (t_level = 'A') then
-        select * from area where level::varchar(1) in ('A', 'B', 'C', 'D');
-    else
-        select * from area;
-    end if;
 end;
 $$ language 'plpgsql';
 
@@ -797,7 +818,7 @@ function for find id_inventory by exemplar
 create or replace function find_inventory_by_exemp(id_exemplar integer)
 returns integer as $$
 begin
-   return (select id_inventory from exemplar where exemplar.id=id_exemplar); 
+   return (select id_inventory from exemplar where exemplar.id=id_exemplar);
 end;
 $$ language 'plpgsql';
 
@@ -878,7 +899,7 @@ end;
 $$ language 'plpgsql';
 
 /*
-  get status team  
+  get status team
 */
 create or replace function get_status_team(id_team integer)
 returns text as $$
@@ -1042,6 +1063,79 @@ $$ language 'plpgsql';
 
 /*=-=-=-=-=-=-=-=--=-=-=-=-=-=-==-=-=--=-=-=-BUSINESS FUNTION-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
+/*
+функция трейдера
+заключение сделки
+Работает
+*/
+create or replace function do_deal(id_deal integer, exemplar_id integer, buyer_id integer, seller_id integer)
+returns void as $$
+begin
+    insert into deal values (id_deal, exemplar_id, buyer_id, seller_id, (select now())::timestamp);
+end;
+$$ language 'plpgsql';
+
+/*
+функция трейдера
+Получение его инвентаря по его id
+РАБОТАЕТ
+*/
+create or replace function get_inventory_by_id(trader_magician_id integer)
+returns setof exemplar as $$
+begin
+     return query select exemplar.id, id_item, id_inventory, status from exemplar where exemplar.id_inventory = (select trader.id_inventory from trader where trader.id_magician = trader_magician_id);
+end;
+$$ language 'plpgsql';
+
+
+/*
+функцияя команды
+внесение информации об участии человека в экмперименте
+РАБОТАЕТ
+*/
+create or replace function doing_hunan_in_experiment(experiment_id integer, human_id integer)
+returns void as $$
+begin
+    update human set id_experiment = experiment_id where human.id = human_id;
+end;
+$$ language 'plpgsql';
+
+/*
+функция команды
+внесение инфомации о экмперименте
+РАБОТАЕТ
+*/
+create or replace function do_experiment(experiment_id integer, mission_id integer, smoke_received_get integer)
+returns void as $$
+begin
+    insert into experiment values (experiment_id, mission_id, smoke_received_get, (select now())::timestamp);
+end;
+$$ language 'plpgsql';
+
+/*
+функция команды
+получения доступных зон
+РАБОТАЕТц
+*/
+create or replace function get_access_area(team_id_s integer)
+returns setof area as $$
+declare
+    t_level varchar(1) = (select team.team_level from team where team.id = team_id_s)::varchar(1);
+begin
+    if (t_level = 'D') then
+        return query select * from area where (level::varchar(1) = 'D');
+    elsif (t_level = 'C') then
+        return query select * from area where (level::varchar(1) in ('D', 'C'));
+    elsif (t_level = 'B') then
+        return query select * from area where (level::varchar(1) in ('D', 'C', 'B'));
+    elsif (t_level = 'A') then
+        return query select * from area where (level::varchar(1) in ('A', 'B', 'C', 'D'));
+    else
+        return query select * from area;
+    end if;
+end;
+$$ language 'plpgsql';
+
 create or replace function show_all_magician()
 returns void as $$
 begin
@@ -1074,10 +1168,10 @@ $$ language 'plpgsql';
 
 create or replace function add_mission(id_miss integer, id_team integer, id_area integer)
 returns void as $$
-declare 
+declare
 	curr_timestamp timestamp = (select localtimestamp);
-begin 
-	insert into mission (id, id_mission, id_team, id_area, start_time) values (id_miss, id_team, id_area, curr_timestamp);
+begin
+	insert into mission (id, id_team, id_area, start_time) values (id_miss, id_team, id_area, curr_timestamp);
 end;
 $$ language 'plpgsql';
 
@@ -1092,10 +1186,10 @@ end;
 $$ language 'plpgsql';
 
 
-create or replace function add_incident(id_inc integer, id_mag integer, team integer)
+create or replace function add_incident(id_inc integer, id_mag integer, mission integer)
 returns void as $$
 begin
-	insert into incident (id, id_team, id_magician) values (id_inc, team, id_mag);
+	insert into incident (id, id_mission, id_magician) values (id_inc, mission, id_mag);
 end;
 $$ language 'plpgsql';
 
