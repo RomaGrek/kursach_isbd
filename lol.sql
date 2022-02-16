@@ -1292,3 +1292,13 @@ from generate_series(1, 2000) as id;
 insert into deal (id, id_buyer, id_exemplar, id_seller, time_deal)
 select id, id+1000, id , id, get_end_time('1986-11-18')
 from generate_series(1, 1000) as id;
+
+
+/*=-=-=-=-=-=-=-=--=-=-=-=-=-=-==-=-=--=-=-=-INDEX-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+
+create index if not exists mag_index_id on magician using hash(id);
+
+create index if not exists mission_index_id on mission using hash(id);
+
+create index if not exists team_index_id on team using hash(id);
+
