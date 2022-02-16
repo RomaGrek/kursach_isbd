@@ -1062,11 +1062,9 @@ end;
 $$ language 'plpgsql';
 
 /*=-=-=-=-=-=-=-=--=-=-=-=-=-=-==-=-=--=-=-=-BUSINESS FUNTION-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-
 /*
 функция трейдера
 заключение сделки
-Работает
 */
 create or replace function do_deal(id_deal integer, exemplar_id integer, buyer_id integer, seller_id integer)
 returns void as $$
@@ -1078,7 +1076,6 @@ $$ language 'plpgsql';
 /*
 функция трейдера
 Получение его инвентаря по его id
-РАБОТАЕТ
 */
 create or replace function get_inventory_by_id(trader_magician_id integer)
 returns setof exemplar as $$
@@ -1091,7 +1088,6 @@ $$ language 'plpgsql';
 /*
 функцияя команды
 внесение информации об участии человека в экмперименте
-РАБОТАЕТ
 */
 create or replace function doing_hunan_in_experiment(experiment_id integer, human_id integer)
 returns void as $$
@@ -1103,7 +1099,6 @@ $$ language 'plpgsql';
 /*
 функция команды
 внесение инфомации о экмперименте
-РАБОТАЕТ
 */
 create or replace function do_experiment(experiment_id integer, mission_id integer, smoke_received_get integer)
 returns void as $$
@@ -1115,7 +1110,6 @@ $$ language 'plpgsql';
 /*
 функция команды
 получения доступных зон
-РАБОТАЕТц
 */
 create or replace function get_access_area(team_id_s integer)
 returns setof area as $$
@@ -1137,26 +1131,29 @@ end;
 $$ language 'plpgsql';
 
 create or replace function show_all_magician()
-returns void as $$
+returns table (id integer, id_team integer, status varchar(5))as $$
 begin
-	select mag.id, mag.id_team ,part.status from magician mag left join participant part on mag.id=part.id;
+	return query select mag.id, mag.id_team ,part.status from magician mag left join participant part on mag.id=part.id;
 end;
 $$ language 'plpgsql';
 
 
 create or replace function show_all_team()
-returns void as $$
+returns setof team as $$
 begin
-	select * from team;
+	return query select * from team;
 end;
 $$ language 'plpgsql';
+
 
 create or replace function add_team(team integer)
 returns void as $$
 begin
-	insert into team (id) values (team);
+	insert into team (id, status_team)  values (team, 'disbanded');
+	
 end;
 $$ language 'plpgsql';
+
 
 create or replace function add_participant_team(id_magician integer, team integer)
 returns void as $$
@@ -1168,10 +1165,10 @@ $$ language 'plpgsql';
 
 create or replace function add_mission(id_miss integer, id_team integer, id_area integer)
 returns void as $$
-declare
+declare 
 	curr_timestamp timestamp = (select localtimestamp);
-begin
-	insert into mission (id, id_team, id_area, start_time) values (id_miss, id_team, id_area, curr_timestamp);
+begin 
+	 insert into mission (id, id_team, id_area, start_time) values (id_miss, id_team, id_area, curr_timestamp);
 end;
 $$ language 'plpgsql';
 
@@ -1192,7 +1189,6 @@ begin
 	insert into incident (id, id_mission, id_magician) values (id_inc, mission, id_mag);
 end;
 $$ language 'plpgsql';
-
 /*=-=-=-=-=-=-=-=--=-=-=-=-=-=-==-=-=--=-=-=-GENERATE DATA=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
 /*generate participant*/
