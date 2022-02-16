@@ -22,6 +22,8 @@ truncate table item,
     incident, exemplar, trader,
     deal, mission_log cascade ;
 
+drop function if exists create_inventory() cascade;
+
 drop function if exists check_deal_complete() cascade;
 
 drop function if exists check_exemp_in_inventory() cascade;
@@ -30,7 +32,21 @@ drop function if exists check_same_id_bs() cascade;
 
 drop function if exists change_inventory() cascade;
 
+drop function if exists add_count_busy_slots() cascade;
+
+drop function if exists check_count_mag_in_team() cascade;
+
 drop function if exists check_insert_mission() cascade;
+
+drop function if exists check_participant_id_for_mag() cascade;
+
+drop function if exists check_participant_id_for_human() cascade;
+
+drop function if exists check_status_human_for_experiment() cascade;
+
+drop function if exists check_start_mission_time() cascade;
+
+drop function if exists add_count_exp_in_mission() cascade;
 
 drop function if exists check_die_human_on_experiment() cascade;
 
@@ -48,13 +64,9 @@ drop function if exists update_level_team_after_exp(integer, varchar) cascade;
 
 drop function if exists add_smoke_after_exp_func(integer, integer, integer) cascade;
 
-drop function if exists do_deal(integer, integer, integer, integer) cascade;
-
-drop function if exists doing_hunan_in_experiment(integer, integer) cascade;
-
-drop function if exists do_experiment(integer, integer, integer) cascade;
-
 drop function if exists auto_update_level_team(integer, integer, integer) cascade;
+
+drop function if exists find_inventory_by_exemp(integer) cascade;
 
 drop function if exists go_level_team_null(integer) cascade;
 
@@ -65,36 +77,6 @@ drop function if exists insert_log(integer, integer) cascade;
 drop function if exists update_id_team_on_mag(integer) cascade;
 
 drop function if exists update_status_participant(integer, varchar) cascade;
-
-drop function if exists show_all_magician() cascade;
-
-drop function if exists show_all_team() cascade;
-
-drop function if exists add_team(integer) cascade;
-
-drop function if exists add_participant_team(integer, integer) cascade;
-
-drop function if exists add_mission(integer, integer, integer) cascade;
-
-drop function if exists set_end_time(integer) cascade;
-
-drop function if exists add_incident(integer, integer, integer) cascade;
-
-drop function if exists add_count_busy_slots() cascade;
-
-drop function if exists check_count_mag_in_team() cascade;
-
-drop function if exists check_participant_id_for_mag() cascade;
-
-drop function if exists check_participant_id_for_human() cascade;
-
-drop function if exists check_status_human_for_experiment() cascade;
-
-drop function if exists check_start_mission_time() cascade;
-
-drop function if exists add_count_exp_in_mission() cascade;
-
-drop function if exists find_inventory_by_exemp(integer) cascade;
 
 drop function if exists get_count_mags_in_team(integer) cascade;
 
@@ -132,9 +114,30 @@ drop function if exists get_title() cascade;
 
 drop function if exists get_gender() cascade;
 
+drop function if exists do_deal(integer, integer, integer, integer) cascade;
+
 drop function if exists get_inventory_by_id(integer) cascade;
 
+drop function if exists doing_hunan_in_experiment(integer, integer) cascade;
+
+drop function if exists do_experiment(integer, integer, integer) cascade;
+
 drop function if exists get_access_area(integer) cascade;
+
+drop function if exists show_all_magician() cascade;
+
+drop function if exists show_all_team() cascade;
+
+drop function if exists add_team(integer) cascade;
+
+drop function if exists add_participant_team(integer, integer) cascade;
+
+drop function if exists add_mission(integer, integer, integer) cascade;
+
+drop function if exists set_end_time(integer) cascade;
+
+drop function if exists add_incident(integer, integer, integer) cascade;
+
 
 
 /* создание сущностей для бд */
@@ -733,7 +736,7 @@ create or replace function create_inventory()
 returns trigger as $$
 begin
 	insert into inventory (id,busy_slots) values (new.id_magician, 0);
-   
+
     return new;
 end;
 $$ language 'plpgsql';
@@ -1165,7 +1168,7 @@ create or replace function add_team(team integer)
 returns void as $$
 begin
 	insert into team (id, status_team)  values (team, 'disbanded');
-	
+
 end;
 $$ language 'plpgsql';
 
@@ -1178,22 +1181,22 @@ end;
 $$ language 'plpgsql';
 
 
-create or replace function add_mission(id_miss integer, id_team integer, id_area integer)
+create or replace function add_mission(id_miss integer, team integer, area integer)
 returns void as $$
-declare 
+declare
 	curr_timestamp timestamp = (select localtimestamp);
-begin 
-	 insert into mission (id, id_team, id_area, start_time) values (id_miss, id_team, id_area, curr_timestamp);
+begin
+	 insert into mission (id, id_team, id_area, start_time) values (id_miss, team, area, curr_timestamp);
 end;
 $$ language 'plpgsql';
 
 
-create or replace function set_end_time(id_team integer)
+create or replace function set_end_time(team integer)
 returns void as $$
 declare
 	curr_timestamp timestamp =(select localtimestamp);
 begin
-	update mission set end_time=curr_timestamp where mission.id=id_team;
+	update mission set end_time=curr_timestamp where mission.id=team;
 end;
 $$ language 'plpgsql';
 
@@ -1269,11 +1272,6 @@ from (select id from experiment) as sub where human.id=(sub.id+10000);
 insert into incident
 select id, id, id
 from generate_series(1, 500) as id;
-
-/*generate inventory*/
-insert into inventory
-select id, 0
-from generate_series(1, 2000) as id;
 
 /*generate trader*/
 insert into trader
