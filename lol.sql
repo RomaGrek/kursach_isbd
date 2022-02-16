@@ -725,9 +725,24 @@ $$ language 'plpgsql';
 
 create trigger auto_check_incident before insert on incident
     for each row execute procedure check_part_mission();
-
 /*
 Триггер 18
+auto add inventory
+*/
+create or replace function create_inventory()
+returns trigger as $$
+begin
+	insert into inventory (id,busy_slots) values (new.id_magician, 0);
+   
+    return new;
+end;
+$$ language 'plpgsql';
+
+create trigger auto_create_inventory before insert on trader
+    for each row execute procedure create_inventory();
+
+/*
+Триггер 19
 Добавление кол-ва дыма магам
 */
 create or replace function add_smoke_after_experiment()
