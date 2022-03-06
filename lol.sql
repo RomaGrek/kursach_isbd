@@ -1085,9 +1085,10 @@ $$ language 'plpgsql';
 заключение сделки
 */
 create or replace function do_deal(id_deal integer, exemplar_id integer, buyer_id integer, seller_id integer)
-returns void as $$
+returns integer as $$
 begin
     insert into deal values (id_deal, exemplar_id, buyer_id, seller_id, (select now())::timestamp);
+	return 1;
 end;
 $$ language 'plpgsql';
 
@@ -1108,9 +1109,10 @@ $$ language 'plpgsql';
 внесение информации об участии человека в экмперименте
 */
 create or replace function doing_hunan_in_experiment(experiment_id integer, human_id integer)
-returns void as $$
+returns integer as $$
 begin
     update human set id_experiment = experiment_id where human.id = human_id;
+	return 1;
 end;
 $$ language 'plpgsql';
 
@@ -1178,9 +1180,10 @@ coordinator function
 add new team
 */
 create or replace function add_team(team integer)
-returns void as $$
+returns integer as $$
 begin
 	insert into team (id, status_team)  values (team, 'disbanded');
+	return 1;
 
 end;
 $$ language 'plpgsql';
@@ -1191,9 +1194,10 @@ coordinator function
 add participant to team
 */
 create or replace function add_participant_team(id_magician integer, team integer)
-returns void as $$
+returns integer as $$
 begin
 	update magician set id_team=team where magician.id=id_magician;
+	return 1;
 end;
 $$ language 'plpgsql';
 
@@ -1203,11 +1207,12 @@ coordinator function
 create mission
 */
 create or replace function add_mission(id_miss integer, team integer, area integer)
-returns void as $$
+returns integer as $$
 declare
 	curr_timestamp timestamp = (select localtimestamp);
 begin
 	 insert into mission (id, id_team, id_area, start_time) values (id_miss, team, area, curr_timestamp);
+	return 1;
 end;
 $$ language 'plpgsql';
 
@@ -1217,11 +1222,12 @@ coordinator function
 mission completion
 */
 create or replace function set_end_time(team integer)
-returns void as $$
+returns integer as $$
 declare
 	curr_timestamp timestamp =(select localtimestamp);
 begin
 	update mission set end_time=curr_timestamp where mission.id=team;
+	return 1;
 end;
 $$ language 'plpgsql';
 
@@ -1231,9 +1237,10 @@ coordinator function
 create incident
 */
 create or replace function add_incident(id_inc integer, id_mag integer, mission integer)
-returns void as $$
+returns integer as $$
 begin
 	insert into incident (id, id_mission, id_magician) values (id_inc, mission, id_mag);
+	return 1;
 end;
 $$ language 'plpgsql';
 /*=-=-=-=-=-=-=-=--=-=-=-=-=-=-==-=-=--=-=-=-GENERATE DATA=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
