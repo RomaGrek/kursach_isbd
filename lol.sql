@@ -1079,7 +1079,7 @@ begin
 end;
 $$ language 'plpgsql';
 
-/*=-=-=-=-=-=-=-=--=-=-=-=-=-=-==-=-=--=-=-=-BUSINESS FUNTION-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/*=-=-=-=-=-=-=-=--=-=-=-=-=-=-==-=-=--=-=-=-BUSINESS FUNCTION-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
 функция трейдера
 заключение сделки
@@ -1119,9 +1119,10 @@ $$ language 'plpgsql';
 внесение инфомации о экмперименте
 */
 create or replace function do_experiment(experiment_id integer, mission_id integer, smoke_received_get integer)
-returns void as $$
+returns integer as $$
 begin
     insert into experiment values (experiment_id, mission_id, smoke_received_get, (select now())::timestamp);
+	return 1;
 end;
 $$ language 'plpgsql';
 
@@ -1148,6 +1149,10 @@ begin
 end;
 $$ language 'plpgsql';
 
+/*
+coordinator function
+receive all magician
+*/
 create or replace function show_all_magician()
 returns table (id integer, id_team integer, status varchar(5))as $$
 begin
@@ -1156,6 +1161,10 @@ end;
 $$ language 'plpgsql';
 
 
+/*
+coordinator function
+receive all team
+*/
 create or replace function show_all_team()
 returns setof team as $$
 begin
@@ -1164,6 +1173,10 @@ end;
 $$ language 'plpgsql';
 
 
+/*
+coordinator function
+add new team
+*/
 create or replace function add_team(team integer)
 returns void as $$
 begin
@@ -1173,6 +1186,10 @@ end;
 $$ language 'plpgsql';
 
 
+/*
+coordinator function
+add participant to team
+*/
 create or replace function add_participant_team(id_magician integer, team integer)
 returns void as $$
 begin
@@ -1181,6 +1198,10 @@ end;
 $$ language 'plpgsql';
 
 
+/*
+coordinator function
+create mission
+*/
 create or replace function add_mission(id_miss integer, team integer, area integer)
 returns void as $$
 declare
@@ -1191,6 +1212,10 @@ end;
 $$ language 'plpgsql';
 
 
+/*
+coordinator function
+mission completion
+*/
 create or replace function set_end_time(team integer)
 returns void as $$
 declare
@@ -1201,6 +1226,10 @@ end;
 $$ language 'plpgsql';
 
 
+/*
+coordinator function
+create incident
+*/
 create or replace function add_incident(id_inc integer, id_mag integer, mission integer)
 returns void as $$
 begin
