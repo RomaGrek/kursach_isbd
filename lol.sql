@@ -1087,7 +1087,8 @@ $$ language 'plpgsql';
 create or replace function do_deal(id_deal integer, exemplar_id integer, buyer_id integer, seller_id integer)
 returns integer as $$
 begin
-    insert into deal values (id_deal, exemplar_id, buyer_id, seller_id, (select now())::timestamp);
+insert into deal (id, id_buyer, id_exemplar, id_seller, time_deal)
+    values (id_deal, buyer_id, exemplar_id, seller_id, (select now())::timestamp);
 	return 1;
 end;
 $$ language 'plpgsql';
