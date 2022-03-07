@@ -116,17 +116,12 @@ drop function if exists get_gender() cascade;
 
 drop function if exists do_deal(integer, integer, integer, integer) cascade;
 
-drop function if exists get_inventory_by_id(integer) cascade;
-
 drop function if exists doing_hunan_in_experiment(integer, integer) cascade;
 
 drop function if exists do_experiment(integer, integer, integer) cascade;
 
-drop function if exists get_access_area(integer) cascade;
-
 drop function if exists show_all_magician() cascade;
 
-drop function if exists show_all_team() cascade;
 
 drop function if exists add_team(integer) cascade;
 
@@ -1146,7 +1141,7 @@ begin
         return query select * from area where (level::varchar(1) in ('D', 'C', 'B'));
     elsif (t_level = 'A') then
         return query select * from area where (level::varchar(1) in ('A', 'B', 'C', 'D'));
-    else
+    elseif(t_level = 'S') then
         return query select * from area;
     end if;
 end;
