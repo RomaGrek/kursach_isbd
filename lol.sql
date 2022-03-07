@@ -122,6 +122,7 @@ drop function if exists do_experiment(integer, integer, integer) cascade;
 
 drop function if exists show_all_magician() cascade;
 
+drop function if exists add_trader(integer) cascade;
 
 drop function if exists add_team(integer) cascade;
 
@@ -1084,6 +1085,8 @@ returns integer as $$
 begin
 insert into deal (id, id_buyer, id_exemplar, id_seller, time_deal)
     values (id_deal, buyer_id, exemplar_id, seller_id, (select now())::timestamp);
+	if ((select * from deal where deal.id = id_deal) is null) then return 0;
+	end if;
 	return 1;
 end;
 $$ language 'plpgsql';
@@ -1108,6 +1111,8 @@ create or replace function doing_hunan_in_experiment(experiment_id integer, huma
 returns integer as $$
 begin
     update human set id_experiment = experiment_id where human.id = human_id;
+	if ((select id_experiment from human where human.id = human_id) is null) then return 0;
+	end if;
 	return 1;
 end;
 $$ language 'plpgsql';
@@ -1120,6 +1125,8 @@ create or replace function do_experiment(experiment_id integer, mission_id integ
 returns integer as $$
 begin
     insert into experiment values (experiment_id, mission_id, smoke_received_get, (select now())::timestamp);
+	if ((select * from experiment where experiment.id = experiment_id) is null) then return 0;
+	end if;
 	return 1;
 end;
 $$ language 'plpgsql';
@@ -1179,6 +1186,8 @@ create or replace function add_team(team integer)
 returns integer as $$
 begin
 	insert into team (id, status_team)  values (team, 'disbanded');
+	if ((select * from team where team.id = team) is null) then return 0;
+	end if;
 	return 1;
 
 end;
@@ -1193,6 +1202,8 @@ create or replace function add_participant_team(id_magician integer, team intege
 returns integer as $$
 begin
 	update magician set id_team=team where magician.id=id_magician;
+	if ((select id_team from magician where magician.id = id_magician) is null) then return 0;
+	end if;
 	return 1;
 end;
 $$ language 'plpgsql';
@@ -1207,7 +1218,9 @@ returns integer as $$
 declare
 	curr_timestamp timestamp = (select localtimestamp);
 begin
-	 insert into mission (id, id_team, id_area, start_time) values (id_miss, team, area, curr_timestamp);
+	insert into mission (id, id_team, id_area, start_time) values (id_miss, team, area, curr_timestamp);
+	if ((select * from mission where mission.id = id_miss) is null) then return 0;
+	end if;
 	return 1;
 end;
 $$ language 'plpgsql';
@@ -1223,6 +1236,8 @@ declare
 	curr_timestamp timestamp =(select localtimestamp);
 begin
 	update mission set end_time=curr_timestamp where mission.id=team;
+	if ((select end_time from mission where mission.id = team) is null) then return 0;
+	end if;
 	return 1;
 end;
 $$ language 'plpgsql';
@@ -1236,6 +1251,23 @@ create or replace function add_incident(id_inc integer, id_mag integer, mission 
 returns integer as $$
 begin
 	insert into incident (id, id_mission, id_magician) values (id_inc, mission, id_mag);
+	if ((select * from incident where incident.id = id_inc) is null) then return 0;
+	end if;
+	return 1;
+end;
+$$ language 'plpgsql';
+
+
+/*
+coordinator function
+generate trader
+*/
+create or replace function add_trader(id integer)
+returns integer as $$
+begin
+	insert into trader (id) values (id);
+	if ((select * from trader where trader.id = id) is null) then return 0;
+	end if;
 	return 1;
 end;
 $$ language 'plpgsql';
