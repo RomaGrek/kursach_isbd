@@ -350,7 +350,7 @@ swap exemplar between inventory
 create or replace function change_inventory()
 returns trigger as $$
 begin
-   update exemplar set id_inventory=new.id_buyer where id_inventory=new.id_seller;
+   update exemplar set id_inventory=new.id_buyer where id_inventory=new.id_seller and id=new.id_exemplar;
    return new;
 end;
 $$ language 'plpgsql';
