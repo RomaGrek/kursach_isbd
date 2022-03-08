@@ -1089,7 +1089,7 @@ begin
 	end if;
 insert into deal (id, id_buyer, id_exemplar, id_seller, time_deal)
     values (id_deal, buyer_id, exemplar_id, seller_id, (select now())::timestamp);
-	if ((select id from deal where deal.id = id_deal) is null
+	if ((select id from deal where deal.id = id_deal) is null)
 	then return 0;
 	end if;
 	return 1;
@@ -1230,7 +1230,7 @@ returns integer as $$
 declare
 	curr_timestamp timestamp = (select localtimestamp);
 begin
-	if ((select id from mission where mission.id = id_miss) is not null
+	if ((select id from mission where mission.id = id_miss) is not null)
 	then return 0;
 	end if;
 	insert into mission (id, id_team, id_area, start_time) values (id_miss, team, area, curr_timestamp);
