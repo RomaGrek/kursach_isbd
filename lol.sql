@@ -13,15 +13,16 @@ truncate table item,
     mission, experiment,
     participant, human, magician,
     incident, exemplar, trader,
-    deal, mission_log;
+    deal, mission_log,
+	roles, users ;
  */
  drop table if exists item,
     team, area, inventory,
     mission, experiment,
     participant, human, magician,
     incident, exemplar, trader,
-    deal, mission_log cascade,
-	roles, users ;
+    deal, mission_log ,
+	roles, users cascade;
 
 drop function if exists create_inventory() cascade;
 
@@ -285,7 +286,7 @@ create table mission_log (
 /* roles №15*/
 create table roles (
        id serial primary key,
-	name varchar(9) not null
+	name varchar(45) not null
 );
 
 /* users №16*/
@@ -1400,17 +1401,17 @@ select id, id+1000, id , id, get_end_time('1986-11-18')
 from generate_series(1, 1000) as id;
 
 /*generate roles*/
-insert into roles values (coordinator), (team), (trader);
+insert into roles values (1, 'coordinator'), (2, 'team'), (3, 'trader');
 
 /*generate users*/
 insert into users values ('11', '11', '11', '1'); /*coordinator*/
 
 insert into users (id, username, password, role_id)/*team*/
-select   ('2' + id::text)::integer, '2'+id::text, '2'+id::text, 2
+select  cast(('2' || id::text) as integer), cast(('2' || id::text) as integer), cast(('2' || id::text) as integer), 2
 from generate_series(1,3500) as id;
 
 insert into users (id, username, password, role_id)/*trader*/
-select ('3' + id::text)::integer, '3' + id::text, '3' + id::text, 3
+select  cast(('3' || id::text) as integer), cast(('3' || id::text) as integer), cast(('3' || id::text) as integer), 3
 from generate_series(1, 2000) as id;
 
 /*=-=-=-=-=-=-=-=--=-=-=-=-=-=-==-=-=--=-=-=-INDEX-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
