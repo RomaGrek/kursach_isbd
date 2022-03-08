@@ -293,8 +293,7 @@ create table users (
 	username varchar(9) not null,
 	password varchar(9) not null,
        role_id integer references roles
-                      on delete cascade not null,
-	p_id integer not null
+                      on delete cascade not null
 );
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=TRIGGERS-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
@@ -729,8 +728,9 @@ check participation mag in mission for incident
 create or replace function check_part_mission()
 returns trigger as $$
 begin
-    if((select id from mission_log where id_mission=new.id_mission and
-		id_magician=new.id_magician) is null) then
+    if((select id from mission where mission.id = new.id_mission) is null
+	or (select id_team from magician where magician.id = new.id_magician) <> 
+	   (select id_team from mission where mission.id = new.id_mission))then
 	return null;
     end if;
     return new;
@@ -1304,10 +1304,10 @@ generate trader
 create or replace function add_trader(id integer)
 returns integer as $$
 begin
-	if ((select id from trader where trader.id = id) is not null) then return 0;
+	if ((select id_magician from trader where trader.id_magician = id) is not null) then return 0;
 	end if;
 	insert into trader (id) values (id);
-	if ((select id from trader where trader.id = id) is null) then return 0;
+	if ((select id_magician from trader where trader.id_magician = id) is null) then return 0;
 	end if;
 	return 1;
 end;
@@ -1402,15 +1402,15 @@ from generate_series(1, 1000) as id;
 insert into roles values (coordinator), (team), (trader);
 
 /*generate users*/
-insert into users values ('1', '1', '1', '1'); /*coordinator*/
+insert into users values ('11', '11', '11', '1'); /*coordinator*/
 
-insert into users (id, username, password, role_id, p_id)/*team*/
-select id, id::text, id::text, 2, id
-from generate_series(2,3500) as id;
+insert into users (id, username, password, role_id)/*team*/
+select   ('2' + id::text)::integer, '2'+id::text, '2'+id::text, 2
+from generate_series(1,3500) as id;
 
-insert into users (id, username, password, role_id, p_id)/*trader*/
-select id, (id-3500)::text, (id-3500)::text, 3, (id-3500)::text
-from generate_series(3501,5500) as id;
+insert into users (id, username, password, role_id)/*trader*/
+select ('3' + id::text)::integer, '3' + id::text, '3' + id::text, 3
+from generate_series(1, 2000) as id;
 
 /*=-=-=-=-=-=-=-=--=-=-=-=-=-=-==-=-=--=-=-=-INDEX-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
