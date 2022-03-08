@@ -1190,12 +1190,12 @@ $$ language 'plpgsql';
 coordinator function
 add new team
 */
-create or replace function add_team(team integer)
+create or replace function add_team(team_id integer)
 returns integer as $$
 begin
-	if ((select id from team where team.id = team) is not null) then return 0;
+	if ((select id from team where team.id = team_id) is not null) then return 0;
 	end if;
-	insert into team (id, status_team)  values (team, 'disbanded');
+	insert into team (id, status_team)  values (team_id, 'disbanded');
 	return 1;
 
 end;
