@@ -1206,12 +1206,15 @@ $$ language 'plpgsql';
 coordinator function
 add participant to team
 */
-create or replace function add_participant_team(id_magician integer, team integer)
+create or replace function add_participant_team(id_magician integer, team_id integer)
 returns integer as $$
 declare
 	current_id_team integer = (select id_team from magician where magician.id = id_magician);
 begin
-	update magician set id_team=team where magician.id=id_magician;
+	if ((select id from team where team.id = team_id) is null) 
+	then return 0;
+	end if;
+	update magician set id_team=team_id where magician.id=id_magician;
 	if ((select id_team from magician where magician.id = id_magician) is null 
 	or (select id_team from magician where magician.id = id_magician) = current_id_team)
 	then return 0;
