@@ -20,7 +20,8 @@ truncate table item,
     mission, experiment,
     participant, human, magician,
     incident, exemplar, trader,
-    deal, mission_log cascade ;
+    deal, mission_log cascade,
+	roles, users ;
 
 drop function if exists create_inventory() cascade;
 
