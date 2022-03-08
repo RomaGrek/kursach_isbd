@@ -281,6 +281,21 @@ create table mission_log (
                       on delete cascade not null
 );
 
+/* roles №15*/
+create table roles (
+       id serial primary key,
+	name varchar(9) not null
+);
+
+/* users №16*/
+create table users (
+       id serial primary key,
+	username varchar(9) not null,
+	password varchar(9) not null,
+       role_id integer references roles
+                      on delete cascade not null,
+	p_id integer not null
+);
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=TRIGGERS-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
 /*
@@ -1383,6 +1398,19 @@ insert into deal (id, id_buyer, id_exemplar, id_seller, time_deal)
 select id, id+1000, id , id, get_end_time('1986-11-18')
 from generate_series(1, 1000) as id;
 
+/*generate roles*/
+insert into roles values (coordinator), (team), (trader);
+
+/*generate users*/
+insert into users values ('1', '1', '1', '1'); /*coordinator*/
+
+insert into users (id, username, password, role_id, p_id)/*team*/
+select id, id::text, id::text, 2, id
+from generate_series(2,3500) as id;
+
+insert into users (id, username, password, role_id, p_id)/*trader*/
+select id, (id-3500)::text, (id-3500)::text, 3, (id-3500)::text
+from generate_series(3501,5500) as id;
 
 /*=-=-=-=-=-=-=-=--=-=-=-=-=-=-==-=-=--=-=-=-INDEX-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
