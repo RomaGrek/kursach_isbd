@@ -1082,10 +1082,15 @@ $$ language 'plpgsql';
 */
 create or replace function do_deal(id_deal integer, exemplar_id integer, buyer_id integer, seller_id integer)
 returns integer as $$
+declare
 begin
+	if ((select id from deal where deal.id = id_deal) is not null)
+	then return 0;
+	end if;
 insert into deal (id, id_buyer, id_exemplar, id_seller, time_deal)
     values (id_deal, buyer_id, exemplar_id, seller_id, (select now())::timestamp);
-	if ((select id from deal where deal.id = id_deal) is null) then return 0;
+	if ((select id from deal where deal.id = id_deal) is null
+	then return 0;
 	end if;
 	return 1;
 end;
@@ -1110,9 +1115,10 @@ $$ language 'plpgsql';
 create or replace function doing_hunan_in_experiment(experiment_id integer, human_id integer)
 returns integer as $$
 begin
-    update human set id_experiment = experiment_id where human.id = human_id;
-	if ((select id_experiment from human where human.id = human_id) is null) then return 0;
+	
+	if ((select id_experiment from human where human.id = human_id) is not null) then return 0;
 	end if;
+    update human set id_experiment = experiment_id where human.id = human_id;
 	return 1;
 end;
 $$ language 'plpgsql';
@@ -1124,6 +1130,8 @@ $$ language 'plpgsql';
 create or replace function do_experiment(experiment_id integer, mission_id integer, smoke_received_get integer)
 returns integer as $$
 begin
+	if ((select id from experiment where experiment.id = experiment_id) is not null) then return 0;
+	end if;
     insert into experiment values (experiment_id, mission_id, smoke_received_get, (select now())::timestamp);
 	if ((select id from experiment where experiment.id = experiment_id) is null) then return 0;
 	end if;
@@ -1185,9 +1193,9 @@ add new team
 create or replace function add_team(team integer)
 returns integer as $$
 begin
-	insert into team (id, status_team)  values (team, 'disbanded');
-	if ((select id from team where team.id = team) is null) then return 0;
+	if ((select id from team where team.id = team) is not null) then return 0;
 	end if;
+	insert into team (id, status_team)  values (team, 'disbanded');
 	return 1;
 
 end;
@@ -1200,9 +1208,13 @@ add participant to team
 */
 create or replace function add_participant_team(id_magician integer, team integer)
 returns integer as $$
+declare
+	current_id_team integer = (select id_team from magician where magician.id = id_magician);
 begin
 	update magician set id_team=team where magician.id=id_magician;
-	if ((select id_team from magician where magician.id = id_magician) is null) then return 0;
+	if ((select id_team from magician where magician.id = id_magician) is null 
+	or (select id_team from magician where magician.id = id_magician) = current_id_team)
+	then return 0;
 	end if;
 	return 1;
 end;
@@ -1218,8 +1230,12 @@ returns integer as $$
 declare
 	curr_timestamp timestamp = (select localtimestamp);
 begin
+	if ((select id from mission where mission.id = id_miss) is not null
+	then return 0;
+	end if;
 	insert into mission (id, id_team, id_area, start_time) values (id_miss, team, area, curr_timestamp);
-	if ((select id from mission where mission.id = id_miss) is null) then return 0;
+	if ((select id from mission where mission.id = id_miss) is null)
+	then return 0;
 	end if;
 	return 1;
 end;
@@ -1230,11 +1246,14 @@ $$ language 'plpgsql';
 coordinator function
 mission completion
 */
+
 create or replace function set_end_time(team integer)
 returns integer as $$
 declare
 	curr_timestamp timestamp =(select localtimestamp);
 begin
+	if ((select end_time from mission where mission.id = team) is not null) then return 0;
+	end if;
 	update mission set end_time=curr_timestamp where mission.id=team;
 	if ((select end_time from mission where mission.id = team) is null) then return 0;
 	end if;
@@ -1250,6 +1269,8 @@ create incident
 create or replace function add_incident(id_inc integer, id_mag integer, mission integer)
 returns integer as $$
 begin
+	if ((select id from incident where incident.id = id_inc) is not null) then return 0;
+	end if;
 	insert into incident (id, id_mission, id_magician) values (id_inc, mission, id_mag);
 	if ((select id from incident where incident.id = id_inc) is null) then return 0;
 	end if;
@@ -1265,6 +1286,8 @@ generate trader
 create or replace function add_trader(id integer)
 returns integer as $$
 begin
+	if ((select id from trader where trader.id = id) is not null) then return 0;
+	end if;
 	insert into trader (id) values (id);
 	if ((select id from trader where trader.id = id) is null) then return 0;
 	end if;
