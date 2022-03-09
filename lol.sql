@@ -293,7 +293,6 @@ create table roles (
 create table users (
        id serial primary key,
 	username varchar(9) not null,
-	password varchar(9) not null,
        role_id integer references roles
                       on delete cascade not null
 );
@@ -1404,14 +1403,14 @@ from generate_series(1, 1000) as id;
 insert into roles values (1, 'coordinator'), (2, 'team'), (3, 'trader');
 
 /*generate users*/
-insert into users values ('11', '11', '11', '1'); /*coordinator*/
+insert into users values ('11', '11', '1'); /*coordinator*/
 
-insert into users (id, username, password, role_id)/*team*/
-select  cast(('2' || id::text) as integer), cast(('2' || id::text) as integer), cast(('2' || id::text) as integer), 2
+insert into users (id, username, role_id)/*team*/
+select  cast(('2' || id::text) as integer), cast(('2' || id::text) as integer), 2
 from generate_series(1,3500) as id;
 
-insert into users (id, username, password, role_id)/*trader*/
-select  cast(('3' || id::text) as integer), cast(('3' || id::text) as integer), cast(('3' || id::text) as integer), 3
+insert into users (id, username, role_id)/*trader*/
+select  cast(('3' || id::text) as integer), cast(('3' || id::text) as integer), 3
 from generate_series(1, 2000) as id;
 
 /*=-=-=-=-=-=-=-=--=-=-=-=-=-=-==-=-=--=-=-=-INDEX-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
